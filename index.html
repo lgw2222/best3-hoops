@@ -68,7 +68,14 @@ td.num,th.num{text-align:right}
 .tag.live{color:var(--good)}
 .tag.sim{color:var(--acc2)}
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
-#modal .card{max-width:440px;width:100%;max-height:80vh;overflow:auto}
+#modal .card{max-width:440px;width:100%;max-height:86vh;overflow:auto}
+#modal .card.wide{max-width:820px}
+a.pl{color:var(--text);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--mute)}
+a.pl:hover{color:var(--acc2)}
+.pc-head{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.pc-head img{width:96px;height:70px;object-fit:cover;object-position:top;border-radius:10px;background:var(--panel2)}
+.pc-ph{width:96px;height:70px;border-radius:10px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:26px;color:var(--acc2)}
+.inj{display:inline-block;background:var(--bad);color:#fff;font-size:11px;font-weight:800;padding:2px 7px;border-radius:5px}
 .lock{color:var(--mute);font-size:12px}
 a{color:var(--blue)}
 </style>
@@ -132,6 +139,8 @@ const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 function eligible(slot,pos){ const e=ELIG[slot]; if(!e) return true; return String(pos||'').split(/[\/,-]/).some(p=>e.includes(p.trim())); }
 const fmt = n => (Math.round(n*10)/10).toString();
+/* a player's name that opens his player card */
+const pLink = (pid, bold) => `<a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${bold?'<b>':''}${esc(pInfo(pid).name)}${bold?'</b>':''}</a>`;
 
 /* ---------- dates / weeks ---------- */
 function ymd(d){ return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
@@ -841,7 +850,7 @@ function toggleCommish(on){
 const canEdit = t => t===ME || isCommish();
 function toast(msg){ openModal(`<p>${esc(msg)}</p><div class="row"><button class="btn pri" onclick="closeModal()">OK</button></div>`); }
 function openModal(html){ $('#modalBody').innerHTML = html; $('#modal').style.display='flex'; }
-function closeModal(){ $('#modal').style.display='none'; }
+function closeModal(){ $('#modal').style.display='none'; $('#modalBody').classList.remove('wide'); CARD_PID=null; ui.cardMore=false; }
 $('#modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
 
 const TABS = [['matchup','Scoreboard'],['cast','FantasyCast'],['team','My Team'],['players','Players'],['draft','Draft'],['mock','Mock Draft'],['sim','Sim Lab'],['trades','Trades'],['standings','Standings'],['settings','Settings'],['league','League']];
@@ -912,7 +921,7 @@ function vMatchup(){
 function detail(T){
   return `<div class="tw"><table><tr><th>Slot</th><th>Player</th><th>Started games</th><th class="num">Pts</th></tr>${T.rows.map(r=>{
     const p = pInfo(r.pid);
-    return `<tr><td>${r.slots.map(s=>`<span class="pos">${s}</span>`).join(' ')}</td><td>${esc(p.name)} <span class="muted small">${esc(p.team)}</span></td>
+    return `<tr><td>${r.slots.map(s=>`<span class="pos">${s}</span>`).join(' ')}</td><td>${pLink(r.pid)} <span class="muted small">${esc(p.team)}</span></td>
     <td>${r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" title="${dayName(g.date)} vs ${esc(g.opp)}: ${g.line.PTS}p ${g.line.REB}r ${g.line.AST}a">${fmt(g.fp)}</span>`).join('')||'<span class="muted small">—</span>'}</td>
     <td class="num"><b>${fmt(r.pts)}</b></td></tr>`; }).join('')}<tr><td></td><td><b>Total</b></td><td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>`;
 }
@@ -944,16 +953,16 @@ function vTeam(){
   const todayCell = pid => { if(!plays(pid,d)) return '<span class="muted small">no game</span>'; const g=gameOn(pid,d); if(g) return `<span class="chip ${ (rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span>`; const n=usedBefore(pid); return `<b>plays</b>${n>=cap?` <span class="small" style="color:var(--acc2)">(already ${n} games — only counts if it beats his worst)</span>`:''}`; };
   S.settings.slots.forEach((slot,i)=>{
     const pid = lu[i], p = pid?pInfo(pid):null, r = pid&&rowOf(pid);
-    const cell = edit && !slotLocked(pid) ? `<select onchange="setSlot('${t}','${d}',${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos) && (x===pid || !slotLocked(x))).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ●':''}</option>`).join('')}</select>`
-      : (p?`${slotLocked(pid)?'🔒 ':''}${esc(p.name)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>`:'<span class="muted">Empty</span>');
+    const cell = edit && !slotLocked(pid) ? (pid?`<a class="pl small" title="Player card" onclick="openPlayer('${pid}')">ⓘ</a> `:'')+`<select onchange="setSlot('${t}','${d}',${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos) && (x===pid || !slotLocked(x))).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ●':''}</option>`).join('')}</select>`
+      : (p?`${slotLocked(pid)?'🔒 ':''}${pLink(pid)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>`:'<span class="muted">Empty</span>');
     h += `<tr><td><span class="pos">${slot}</span></td><td>${cell}</td><td>${p?todayCell(pid):''}</td>
       <td>${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" title="${dayName(g.date)}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num"><b>${r?fmt(r.pts):''}</b></td></tr>`;
   });
   const benchPts = T.rows.filter(r=>!lu.includes(r.pid));
   h += `<tr><td></td><td><b>Week total</b></td><td></td><td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>
-    ${benchPts.length?`<p class="muted small">Also counting this week (started on other days): ${benchPts.map(r=>`${esc(pInfo(r.pid).name)} ${fmt(r.pts)}`).join(' · ')}</p>`:''}
-    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th><th>Today</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${esc(i.name)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td><td>${plays(p,d)?'<b>plays</b> <span class="muted small">(won\'t count on bench)</span>':'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
-    ${S.settings.irSlots?`<h3>Injured reserve (${irIds(t).length}/${S.settings.irSlots})</h3><div class="card tw"><table>${irIds(t).map(p=>{const i=pInfo(p);return `<tr><td>${esc(i.name)} <span class="muted small">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span></td><td class="num">${canEdit(t)?`<button class="btn sm" onclick="activateIR('${t}','${p}')">Activate</button> <button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted small">Empty. Players listed as OUT can be moved here from the bench to free a roster spot (games on IR never count).</td></tr>'}</table></div>`:''}`;
+    ${benchPts.length?`<p class="muted small">Also counting this week (started on other days): ${benchPts.map(r=>`${pLink(r.pid)} ${fmt(r.pts)}`).join(' · ')}</p>`:''}
+    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th><th>Today</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td><td>${plays(p,d)?'<b>plays</b> <span class="muted small">(won\'t count on bench)</span>':'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
+    ${S.settings.irSlots?`<h3>Injured reserve (${irIds(t).length}/${S.settings.irSlots})</h3><div class="card tw"><table>${irIds(t).map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)} <span class="muted small">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span></td><td class="num">${canEdit(t)?`<button class="btn sm" onclick="activateIR('${t}','${p}')">Activate</button> <button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted small">Empty. Players listed as OUT can be moved here from the bench to free a roster spot (games on IR never count).</td></tr>'}</table></div>`:''}`;
   return h;
 }
 function setSlot(t,d,i,pid){
@@ -998,7 +1007,7 @@ function renderPlayerList(){
     let btn = '';
     if (draft) btn = `<button class="btn sm pri" ${myPick?'':'disabled'} onclick="makePick('${p.id}')">Draft</button>`;
     else if (!own && done) btn = myClaims.has(p.id) ? '<span class="tag">Claimed</span>' : `<button class="btn sm pri" onclick="${full?`pickDrop('${p.id}')`:`addPlayer(ME,'${p.id}')`}">${onWaivers(p.id)?'Claim':'Add'}</button>`;
-    return `<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${esc(p.name)}${p.inj?` <span class="muted small">${esc(p.inj)}</span>`:''}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td>
+    return `<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${pLink(p.id)}${p.inj?` <span class="muted small">${esc(p.inj)}</span>`:''}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td>
     ${draft?'':`<td>${own?esc(tName(own)):onWaivers(p.id)?`<span class="small" style="color:var(--acc2)" title="${esc(waiverText(p.id))}">W</span>`:'<span class="muted">FA</span>'}</td><td class="num">${a===null?'—':fmt(a)}</td>`}<td class="num">${btn}</td></tr>`;}).join('')}</table>`;
 }
 function pickDrop(pid){
@@ -1025,7 +1034,7 @@ function vDraft(){
   const N = d.N; let b = `<div class="tw"><div class="board" style="grid-template-columns:repeat(${N},minmax(92px,1fr))">` + S.draft.order.map(t=>`<div class="hd">${esc(tName(t))}</div>`).join('');
   for (let r=0;r<dRounds();r++) for (let c=0;c<N;c++){
     const n = pickAt(r,c), pk = S.draft.picks[n], team = S.draft.order[c];
-    b += `<div class="${team===ME?'me':''}">${pk?`<b>${esc(pInfo(pk.pid).name)}</b><br><span class="muted">${esc(pInfo(pk.pid).pos)} · ${r+1}.${(n%N)+1}${pk.keeper?' · <span style="color:var(--acc2)">KEEPER</span>':''}</span>`:`<span class="muted">${r+1}.${(n%N)+1}</span>`}</div>`;
+    b += `<div class="${team===ME?'me':''}">${pk?`${pLink(pk.pid,true)}<br><span class="muted">${esc(pInfo(pk.pid).pos)} · ${r+1}.${(n%N)+1}${pk.keeper?' · <span style="color:var(--acc2)">KEEPER</span>':''}</span>`:`<span class="muted">${r+1}.${(n%N)+1}</span>`}</div>`;
   }
   b += `</div></div>`;
   if (st==='live') h += `<div class="grid2"><div>${filterBar()}<div id="plist" class="card tw"></div></div><div class="card">${b}</div></div>`;
@@ -1047,7 +1056,7 @@ function vTrades(){
   const trs = Object.entries(S.trades).sort((a,b)=>b[1].ts-a[1].ts);
   if (!trs.length) h += `<p class="muted">No trades yet.</p>`;
   for (const [id,tr] of trs){
-    const names = o => Object.keys(o||{}).map(p=>esc(pInfo(p).name)).join(', ')||'nothing';
+    const names = o => Object.keys(o||{}).map(p=>pLink(p)).join(', ')||'nothing';
     let act = '';
     if (tr.status==='pending'){
       if (tr.to===ME || isCommish()) act += `<button class="btn sm pri" onclick="acceptTrade('${id}')">Accept${tr.to!==ME?' (as '+esc(tName(tr.to))+')':''}</button> <button class="btn sm" onclick="Store.update({'trades/${id}/status':'rejected'})">Reject</button> `;
@@ -1250,7 +1259,7 @@ function vMock(){
   }
   const N = MOCK.N; let b = `<div class="tw"><div class="board" style="grid-template-columns:repeat(${N},minmax(84px,1fr))">` + Array.from({length:N},(_,i)=>`<div class="hd">${mockTeamName(i)}</div>`).join('');
   for (let r=0;r<MOCK.rounds;r++) for (let c=0;c<N;c++){ const k = r%2===0? r*N+c : r*N+(N-1-c), pid = MOCK.picks[k];
-    b += `<div class="${c===mockMine()?'me':''}">${pid?`<b>${esc(pInfo(pid).name)}</b><br><span class="muted">${esc(pInfo(pid).pos)} · ${r+1}.${k%N+1}</span>`:`<span class="muted">${r+1}.${k%N+1}</span>`}</div>`; }
+    b += `<div class="${c===mockMine()?'me':''}">${pid?`${pLink(pid,true)}<br><span class="muted">${esc(pInfo(pid).pos)} · ${r+1}.${k%N+1}</span>`:`<span class="muted">${r+1}.${k%N+1}</span>`}</div>`; }
   b += `</div></div>`;
   h += done ? `<div class="card">${b}</div>` : `<div class="grid2"><div><div class="row" style="margin-bottom:10px"><input id="mq" placeholder="Search players" value="${esc(ui.mq||'')}" oninput="ui.mq=this.value;renderMockList()">
     <select onchange="ui.mpos=this.value;renderMockList()">${['ALL','PG','SG','SF','PF','C','G','F'].map(p=>`<option ${p===(ui.mpos||'ALL')?'selected':''}>${p}</option>`).join('')}</select></div><div id="mlist" class="card tw"></div>
@@ -1261,7 +1270,7 @@ function renderMockList(){
   const el = $('#mlist'); if (!el || !MOCK) return;
   const q = norm(ui.mq), pos = ui.mpos||'ALL', myTurn = MOCK.picks.length<mockTotal() && mockTeamAt(MOCK.picks.length)===mockMine();
   const list = mockAvail().filter(p=>(!q||norm(p.name).includes(q))&&(pos==='ALL'||eligible(pos,p.pos))).slice(0,60);
-  el.innerHTML = `<table><tr><th>Rk</th><th>Player</th><th>Pos</th><th>NBA</th><th></th></tr>${list.map(p=>`<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${esc(p.name)}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td><td class="num"><button class="btn sm pri" ${myTurn?'':'disabled'} onclick="mockPick('${p.id}')">Draft</button></td></tr>`).join('')}</table>`;
+  el.innerHTML = `<table><tr><th>Rk</th><th>Player</th><th>Pos</th><th>NBA</th><th></th></tr>${list.map(p=>`<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${pLink(p.id)}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td><td class="num"><button class="btn sm pri" ${myTurn?'':'disabled'} onclick="mockPick('${p.id}')">Draft</button></td></tr>`).join('')}</table>`;
 }
 function mockToLeague(){
   if (STORE_MODE==='firebase'){ lsSet('b3h_pending_mock','1'); location.href = location.pathname+'?demo=1'; return; }
@@ -1274,6 +1283,94 @@ function mockToLeague(){
   ME = 't'+mockMine(); lsSet('b3h_me', ME);
   Store.replace({settings:{...DEFAULT_SETTINGS, name:'Test League (from mock)', numTeams:MOCK.N, rosterSize:MOCK.rounds}, teams, rosters, lineups:{}, trades:{}, log:{x:{ts:Date.now(),text:'Test league created from a mock draft'}}, draft:{status:'done', order, picks}, created:Date.now()});
   go('matchup');
+}
+
+/* =================== PLAYER CARD (ESPN-style pop-up) =================== */
+const PCACHE = {};   // ESPN game logs by athlete id + season
+function seasonYear(){ return (parseInt(S.settings.season)||2026)+1; }          // ESPN labels 2026-27 as 2027
+async function fetchGameLog(id, season){
+  const key = id+'|'+season; if (PCACHE[key]) return PCACHE[key];
+  const j = await (await fetch(`https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${id}/gamelog?season=${season}`)).json();
+  const labels = j.labels||[], evs = j.events||{}, out = [];
+  for (const st of (j.seasonTypes||[])){
+    if (/pre/i.test(st.displayName||'')) continue;
+    for (const cat of (st.categories||[])) for (const e of (cat.events||[])){
+      const ev = evs[e.eventId]||{}, get = l => { const i = labels.indexOf(l); return i<0 ? '0' : (e.stats||[])[i]; };
+      const ma = l => String(get(l)).split('-').map(x=>parseInt(x)||0);
+      const [FGM,FGA] = ma('FG'), [TPM,TPA] = ma('3PT'), [FTM,FTA] = ma('FT');
+      const line = {PTS:+get('PTS')||0, FGM, FGA, '3PM':TPM, '3PA':TPA, FTM, FTA, REB:+get('REB')||0, AST:+get('AST')||0, STL:+get('STL')||0, BLK:+get('BLK')||0, TO:+get('TO')||0, PF:+get('PF')||0, MIN:parseInt(get('MIN'))||0};
+      if (ev.gameDate) out.push({date: ymd(new Date(ev.gameDate)), opp: `${ev.atVs||''} ${(ev.opponent&&ev.opponent.abbreviation)||''}`.trim(), result: ev.gameResult||'', line});
+    }
+  }
+  out.sort((a,b)=>b.date.localeCompare(a.date));
+  PCACHE[key] = out; return out;
+}
+function simLog(pid){
+  const out = [], last = curWeek();
+  for (let w=1; w<=last; w++) for (const g of playerGames(pid,w)) out.push({date:g.date, opp:'vs '+g.opp, result:'', line:g.line});
+  return out.sort((a,b)=>b.date.localeCompare(a.date));
+}
+function avgRow(log){
+  if (!log || !log.length) return null;
+  const n = log.length, sum = k => log.reduce((a,g)=>a+statVal(g.line,k),0), fp = log.reduce((a,g)=>a+fpts(g.line),0);
+  return {GP:n, MIN:sum('MIN')/n, PTS:sum('PTS')/n, REB:sum('REB')/n, AST:sum('AST')/n, STL:sum('STL')/n, BLK:sum('BLK')/n, TO:sum('TO')/n, '3PM':sum('3PM')/n, FPG:fp/n, FPTS:fp};
+}
+/* what happened to each game in the fantasy league: started & counted, started but outside best 3, or on the bench */
+function fantasyTag(pid, d){
+  const t = ownerOf(pid); if (!t || !S.draft || S.draft.status!=='done') return '';
+  const w = weekOfDate(d); if (w<1 || weekDates(w).indexOf(d)<0) return '';
+  const r = teamWeek(t,w).rows.find(x=>x.pid===pid), g = r && r.games.find(x=>x.date===d);
+  if (g) return g.counted ? '<span class="chip c">counted</span>' : '<span class="chip x">not in best 3</span>';
+  return '<span class="small muted">bench</span>';
+}
+function upcoming(pid){
+  const out = [], start = isSim() ? (()=>{ const w=curWeek(), ds=weekDates(w); return ds[Math.min(simDaysPlayed(w), ds.length-1)]; })() : todayStr();
+  let d = new Date(+start.slice(0,4), +start.slice(4,6)-1, +start.slice(6));
+  for (let i=0;i<7;i++){ const k = ymd(d); if (plays(pid,k)){ const opp = isSim() ? 'vs '+oppOn(pid,k) : ((GI[k]&&GI[k][pInfo(pid).team]||{}).opp||''); out.push(`${dayName(k)} ${+k.slice(4,6)}/${+k.slice(6)} ${esc(opp)}`); } d.setDate(d.getDate()+1); }
+  return out;
+}
+let CARD_PID = null;
+function openPlayer(pid){ CARD_PID = pid; ui.cardTab = 'log'; drawPlayer(pid, null); if (S && !isSim() && /^\d+$/.test(pid)) loadCardLive(pid); }
+async function loadCardLive(pid){
+  const y = seasonYear(), res = {};
+  try{ res.cur = await fetchGameLog(pid, y); }catch(e){ res.err = true; }
+  try{ res.prev = await fetchGameLog(pid, y-1); }catch(e){}
+  if (CARD_PID===pid) drawPlayer(pid, res);
+}
+function drawPlayer(pid, live){
+  const p = pInfo(pid), own = S ? ownerOf(pid) : null, sim = !S || isSim();
+  const log = sim ? (S ? simLog(pid) : []) : (live && live.cur) || [];
+  const prev = !sim && live ? live.prev : null;
+  const A = avgRow(log), P = avgRow(prev), proj = projAvg(p);
+  const status = own ? `Manager: <b>${esc(tName(own))}</b>${S.rosters[own][pid].ir?' (IR)':''}` : S && onWaivers(pid) ? `<span style="color:var(--acc2)">${esc(waiverText(pid))}</span>` : 'Free agent';
+  let btns = '';
+  if (S && S.draft.status==='done'){
+    if (!own) btns = `<button class="btn pri" onclick="closeModal();${activeCount(ME)>=S.settings.rosterSize?`pickDrop('${pid}')`:`addPlayer(ME,'${pid}')`}">${onWaivers(pid)?'Put in claim':'Add'}</button>`;
+    else if (own===ME) btns = `${!S.rosters[ME][pid].ir&&S.settings.irSlots&&canIR(pid)?`<button class="btn" onclick="closeModal();moveToIR(ME,'${pid}')">Move to IR</button>`:''}<button class="btn danger" onclick="closeModal();confirmDrop(ME,'${pid}')">Drop</button>`;
+    else btns = `<button class="btn" onclick="closeModal();ui.tradeWith='${own}';ui.tradeGet=new Set(['${pid}']);go('trades')">Propose trade</button>`;
+  }
+  const avgCells = a => a ? `<td class="num">${a.GP}</td><td class="num">${fmt(a.MIN)}</td><td class="num">${fmt(a.PTS)}</td><td class="num">${fmt(a.REB)}</td><td class="num">${fmt(a.AST)}</td><td class="num">${fmt(a.STL)}</td><td class="num">${fmt(a.BLK)}</td><td class="num">${fmt(a.TO)}</td><td class="num"><b>${fmt(a.FPG)}</b></td><td class="num">${Math.round(a.FPTS)}</td>` : `<td colspan="10" class="muted small">No games yet</td>`;
+  const seasonName = S ? S.settings.season : '2026-27', prevName = `${(parseInt(seasonName)||2026)-1}-${String((parseInt(seasonName)||2026)).slice(2)}`;
+  const up = S ? upcoming(pid) : [];
+  const w = S ? curWeek() : 1, wkGames = S ? gamesThisWeek(pid,w) : 0;
+  const headshot = /^\d+$/.test(pid) ? `<img src="https://a.espncdn.com/i/headshots/nba/players/full/${pid}.png" alt="" onerror="this.outerHTML='<div class=&quot;pc-ph&quot;>${esc(p.name.split(' ').map(x=>x[0]).join('').slice(0,2))}</div>'">` : `<div class="pc-ph">${esc(p.name.split(' ').map(x=>x[0]).join('').slice(0,2))}</div>`;
+  const html = `<div class="row" style="justify-content:space-between;align-items:flex-start"><div class="pc-head">${headshot}
+      <div><div style="font-size:22px;font-weight:900">${esc(p.name)}</div><div class="muted">${esc(p.team)} · <span class="pos">${esc(p.pos)}</span>${p.rank&&p.rank<=RANKS.length?` · Rank #${p.rank}`:''}</div>
+      <div class="small" style="margin-top:4px">${p.inj?`<span class="inj">${esc(p.inj.toUpperCase())}</span> `:''}${status}</div></div></div>
+      <button class="btn sm" onclick="closeModal()">✕</button></div>
+    <div class="row" style="margin:12px 0">${btns}</div>
+    <div class="card" style="background:var(--panel2)"><b>Best-3 outlook — Week ${w}:</b> ${wkGames} NBA game${wkGames===1?'':'s'} this week${wkGames>S?.settings.gameCap?` (only his best ${S.settings.gameCap} count)`:''}. Next 7 days: ${up.length?up.join(' · '):'no games'}.</div>
+    <h3>Stats</h3><div class="tw"><table><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num">FP/G</th><th class="num">FPTS</th></tr>
+      <tr><td>${esc(seasonName)}${sim?' <span class="muted small">(sim)</span>':''}</td>${avgCells(A)}</tr>
+      ${!sim?`<tr><td>${esc(prevName)}</td>${live?avgCells(P):'<td colspan="10" class="muted small">Loading…</td>'}</tr>`:''}
+      <tr><td>Projected</td><td colspan="8" class="muted small">based on preseason rank</td><td class="num"><b>${fmt(proj)}</b></td><td class="num">${Math.round(proj*72)}</td></tr></table></div>
+    <h3>Game log</h3>${!sim&&!live?'<p class="muted small">Loading ESPN game log…</p>':''}${live&&live.err?'<p class="muted small">Couldn\'t reach ESPN for this player\'s game log.</p>':''}
+    <div class="tw"><table><tr><th>Date</th><th>Opp</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num">FPTS</th><th>Fantasy</th></tr>
+      ${log.slice(0, ui.cardMore?60:10).map(g=>`<tr><td>${+g.date.slice(4,6)}/${+g.date.slice(6)}</td><td>${esc(g.opp)} <span class="muted small">${esc(g.result)}</span></td><td class="num">${g.line.MIN||'—'}</td><td class="num">${g.line.PTS}</td><td class="num">${g.line.REB}</td><td class="num">${g.line.AST}</td><td class="num">${g.line.STL}</td><td class="num">${g.line.BLK}</td><td class="num">${g.line.TO}</td><td class="num"><b>${fmt(fpts(g.line))}</b></td><td>${S?fantasyTag(pid,g.date):''}</td></tr>`).join('') || `<tr><td colspan="11" class="muted small">No games played yet this season${prev&&prev.length?' — last season below':''}.</td></tr>`}
+      ${!log.length&&prev&&prev.length?prev.slice(0,10).map(g=>`<tr class="muted"><td>${+g.date.slice(4,6)}/${+g.date.slice(6)}/${g.date.slice(2,4)}</td><td>${esc(g.opp)}</td><td class="num">${g.line.MIN}</td><td class="num">${g.line.PTS}</td><td class="num">${g.line.REB}</td><td class="num">${g.line.AST}</td><td class="num">${g.line.STL}</td><td class="num">${g.line.BLK}</td><td class="num">${g.line.TO}</td><td class="num">${fmt(fpts(g.line))}</td><td></td></tr>`).join(''):''}
+    </table></div>${log.length>10&&!ui.cardMore?`<div class="row" style="justify-content:center;margin-top:8px"><button class="btn sm" onclick="ui.cardMore=true;drawPlayer('${pid}',${live?'LIVE_CARD':'null'})">Show more</button></div>`:''}`;
+  window.LIVE_CARD = live;
+  $('#modalBody').classList.add('wide'); openModal(html);
 }
 
 /* =================== FANTASYCAST: live stats + fantasy points for a matchup =================== */
@@ -1311,7 +1408,7 @@ function vCast(){
       const used = r ? r.games.length : 0;
       const capNote = slot && g ? (wk && wk.counted ? '' : ' <span class="small" style="color:var(--bad)">not counting (not in his best '+cap+')</span>') : '';
       return `<tr style="${slot?'':'opacity:.55'}"><td><span class="pos">${slot||'BN'}</span></td>
-        <td><b>${esc(p.name)}</b> <span class="muted small">${esc(p.pos)} · ${esc(p.team)}</span><div class="small ${gs.state==='in'?'':'muted'}" style="${gs.state==='in'?'color:var(--good)':''}">${esc(gs.txt)}</div>${statTxt?`<div class="small">${statTxt}</div>`:''}</td>
+        <td>${pLink(pid,true)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}</span><div class="small ${gs.state==='in'?'':'muted'}" style="${gs.state==='in'?'color:var(--good)':''}">${esc(gs.txt)}</div>${statTxt?`<div class="small">${statTxt}</div>`:''}</td>
         <td class="num">${fp===null?'<span class="muted">—</span>':`<span class="chip ${slot?(wk&&wk.counted?'c':'x'):''}" style="font-size:14px">${fmt(fp)}</span>`}${capNote}</td>
         <td class="num"><span class="small muted">${used<=cap?`${used}/${cap} games`:`${used} games · best ${cap}`}</span><br><b>${r?fmt(r.pts):'0'}</b></td></tr>`;
     };
