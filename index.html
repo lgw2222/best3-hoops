@@ -71,6 +71,8 @@ td.num,th.num{text-align:right}
 #modal .card{max-width:440px;width:100%;max-height:86vh;overflow:auto}
 #modal .card.wide{max-width:820px}
 a.pl{color:var(--text);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--mute)}
+img.hs{width:30px;height:22px;object-fit:cover;object-position:top;border-radius:50%;background:var(--panel2);vertical-align:middle;margin-right:6px}
+.board img.hs{display:none}
 a.pl:hover{color:var(--acc2)}
 .pc-head{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 .pc-head img{width:96px;height:70px;object-fit:cover;object-position:top;border-radius:10px;background:var(--panel2)}
@@ -121,7 +123,7 @@ const STAT_LABELS = {PTS:'Points',FGM:'Field Goals Made',FGA:'Field Goals Attemp
   TO:'Turnovers',PF:'Personal Fouls',MIN:'Minutes',DD:'Double-Double',TD:'Triple-Double',QD:'Quadruple-Double'};
 const SLOT_TYPES = ['PG','SG','SF','PF','C','G','F','SG/SF','G/F','PF/C','F/C','UTIL'];
 const ELIG = {PG:['PG','G'],SG:['SG','G'],SF:['SF','F'],PF:['PF','F'],C:['C'],G:['PG','SG','G'],F:['SF','PF','F'],'SG/SF':['SG','SF','G','F'],'G/F':['PG','SG','SF','PF','G','F'],'PF/C':['PF','C','F'],'F/C':['SF','PF','C','F'],UTIL:null};
-const NBA = ['ATL','BOS','BKN','CHA','CHI','CLE','DAL','DEN','DET','GS','HOU','IND','LAC','LAL','MEM','MIA','MIL','MIN','NOP','NYK','OKC','ORL','PHI','PHX','POR','SAC','SA','TOR','UTA','WAS'];
+const NBA = ['ATL','BOS','BKN','CHA','CHI','CLE','DAL','DEN','DET','GS','HOU','IND','LAC','LAL','MEM','MIA','MIL','MIN','NO','NY','OKC','ORL','PHI','PHX','POR','SAC','SA','TOR','UTAH','WSH'];
 
 /* Rank list for ordering the player pool (also the offline fallback pool; teams approximate). */
 const RANKS = `Nikola Jokic|DEN|C;Shai Gilgeous-Alexander|OKC|PG;Victor Wembanyama|SA|C;Giannis Antetokounmpo|MIL|PF;Luka Doncic|LAL|PG;Anthony Edwards|MIN|SG;Cade Cunningham|DET|PG;Tyrese Haliburton|IND|PG;Jayson Tatum|BOS|SF;Anthony Davis|DAL|PF;Jalen Johnson|ATL|SF;Domantas Sabonis|SAC|C;Karl-Anthony Towns|NYK|C;Trae Young|ATL|PG;Devin Booker|PHX|SG;Jalen Brunson|NYK|PG;Donovan Mitchell|CLE|SG;Kevin Durant|HOU|SF;Stephen Curry|GS|PG;LeBron James|PHI|SF;James Harden|LAC|PG;Alperen Sengun|HOU|C;Paolo Banchero|ORL|PF;Scottie Barnes|TOR|SF;Evan Mobley|CLE|PF;Chet Holmgren|OKC|C;Jaren Jackson Jr.|MEM|PF;Bam Adebayo|MIA|C;Kawhi Leonard|LAC|SF;Ja Morant|MEM|PG;LaMelo Ball|CHA|PG;Tyrese Maxey|PHI|PG;Joel Embiid|PHI|C;Jamal Murray|DEN|PG;Zion Williamson|NOP|PF;De'Aaron Fox|SA|PG;Pascal Siakam|IND|PF;Franz Wagner|ORL|SF;Lauri Markkanen|UTA|PF;Jalen Williams|OKC|SF;Josh Giddey|CHI|PG;Ivica Zubac|LAC|C;Desmond Bane|ORL|SG;Derrick White|BOS|PG;Jaylen Brown|BOS|SG;Kristaps Porzingis|ATL|C;Amen Thompson|HOU|SG;Cooper Flagg|DAL|SF;Deni Avdija|POR|SF;Darius Garland|CLE|PG;Mikal Bridges|NYK|SF;OG Anunoby|NYK|SF;Myles Turner|MIL|C;Jarrett Allen|CLE|C;Walker Kessler|UTA|C;Nikola Vucevic|CHI|C;Rudy Gobert|MIN|C;Julius Randle|MIN|PF;Zach LaVine|SAC|SG;DeMar DeRozan|SAC|SF;Jimmy Butler|GS|SF;Kyrie Irving|DAL|PG;Dyson Daniels|ATL|SG;Josh Hart|NYK|SG;Brandon Miller|CHA|SF;Jalen Duren|DET|C;Onyeka Okongwu|ATL|C;Austin Reaves|LAL|SG;Coby White|CHI|SG;Immanuel Quickley|TOR|PG;Norman Powell|MIA|SG;Tyler Herro|MIA|SG;Cam Thomas|BKN|SG;Michael Porter Jr.|BKN|SF;Jabari Smith Jr.|HOU|PF;Stephon Castle|SA|PG;Keyonte George|UTA|PG;Payton Pritchard|BOS|PG;Aaron Gordon|DEN|PF;Christian Braun|DEN|SG;Mark Williams|PHX|C;Nic Claxton|BKN|C;Brandon Ingram|TOR|SF;RJ Barrett|TOR|SF;Anfernee Simons|BOS|SG;Jrue Holiday|POR|PG;Shaedon Sharpe|POR|SG;Scoot Henderson|POR|PG;Donovan Clingan|POR|C;Alex Sarr|WAS|C;Bilal Coulibaly|WAS|SF;CJ McCollum|WAS|SG;Kel'el Ware|MIA|C;Andrew Wiggins|MIA|SF;Miles Bridges|CHA|PF;Kon Knueppel|CHA|SG;Dylan Harper|SA|SG;Ace Bailey|UTA|SF;VJ Edgecombe|PHI|SG;Zaccharie Risacher|ATL|SF;Toumani Camara|POR|SF;Isaiah Hartenstein|OKC|C;Luguentz Dort|OKC|SG;Naz Reid|MIN|C;Mike Conley|MIN|PG;Draymond Green|GS|PF;Jonathan Kuminga|GS|PF;Brandin Podziemski|GS|SG;Herbert Jones|NOP|SF;Trey Murphy III|NOP|SF;Jordan Poole|NOP|SG;Dejounte Murray|NOP|PG;Daniel Gafford|DAL|C;Klay Thompson|DAL|SG;Dereck Lively II|DAL|C;Bennedict Mathurin|IND|SG;Andrew Nembhard|IND|PG;Jaden Ivey|DET|SG;Ausar Thompson|DET|SF;Tobias Harris|DET|PF;Kyle Kuzma|MIL|PF;Bobby Portis|MIL|PF;Kevin Porter Jr.|MIL|PG;Grayson Allen|PHX|SG;Dillon Brooks|PHX|SF;Jusuf Nurkic|UTA|C;Collin Sexton|CHA|PG;Malik Monk|SAC|SG;Keegan Murray|SAC|PF;Santi Aldama|MEM|PF;Zach Edey|MEM|C;Jaylen Wells|MEM|SF;Tari Eason|HOU|PF;Fred VanVleet|HOU|PG;Jakob Poeltl|TOR|C;Paul George|PHI|SF;Kelly Oubre Jr.|PHI|SF;Chris Paul|LAC|PG;Bradley Beal|LAC|SG;Russell Westbrook|SAC|PG`
@@ -140,7 +142,8 @@ function loadScript(src){ return new Promise((res,rej)=>{ const s=document.creat
 function eligible(slot,pos){ const e=ELIG[slot]; if(!e) return true; return String(pos||'').split(/[\/,-]/).some(p=>e.includes(p.trim())); }
 const fmt = n => (Math.round(n*10)/10).toString();
 /* a player's name that opens his player card */
-const pLink = (pid, bold) => `<a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${bold?'<b>':''}${esc(pInfo(pid).name)}${bold?'</b>':''}</a>`;
+const pImg = pid => /^\d+$/.test(pid) ? `<img class="hs" loading="lazy" src="https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${pid}.png&w=96&h=70&cb=1" alt="" onerror="this.style.visibility='hidden'">` : '';
+const pLink = (pid, bold) => `<a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${pImg(pid)}${bold?'<b>':''}${esc(pInfo(pid).name)}${bold?'</b>':''}</a>`;
 
 /* ---------- dates / weeks ---------- */
 function ymd(d){ return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
@@ -269,31 +272,50 @@ function logUpdate(u,text){ u['log/'+uid()] = {ts:Date.now(), text}; return u; }
 /* ---------- player pool ---------- */
 let POOL = {}, POOL_SRC = 'loading';
 const RANK_BY_NAME = Object.fromEntries(RANKS.map(p=>[norm(p.name),p.rank]));
+/* ESPN fantasy stat ids → our stat keys */
+const ESPN_STAT = {0:'PTS',1:'BLK',2:'STL',3:'AST',4:'OREB',5:'DREB',6:'REB',9:'PF',11:'TO',13:'FGM',14:'FGA',15:'FTM',16:'FTA',17:'3PM',18:'3PA',40:'MIN',42:'GP'};
+const ESPN_POS = {0:'PG',1:'SG',2:'SF',3:'PF',4:'C'};
+/* which NBA season (ESPN numbering: the 2026-27 season = 2027) — new season from September */
+function nbaSeasonYear(){ if (S && S.settings && S.settings.season) return (parseInt(S.settings.season)||2026)+1; const d=new Date(); return d.getMonth()>=8 ? d.getFullYear()+1 : d.getFullYear(); }
+function espnPerGame(st){
+  const s = st && st.stats; if (!s || !s['42']) return null;
+  const g = s['42'], out = {GP:g};
+  for (const k in ESPN_STAT){ const key = ESPN_STAT[k]; if (key!=='GP' && s[k]!==undefined) out[key] = s[k]/g; }
+  if (s['37']!==undefined) out.DDtot = s['37']; if (s['38']!==undefined) out.TDtot = s['38'];
+  return out;
+}
+async function fetchJSON(url, opts, ms){ const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), ms||12000); try{ const r = await fetch(url, {...(opts||{}), signal:ctl.signal}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } finally { clearTimeout(t); } }
+/* Player pool = ESPN fantasy player list (real rankings, positions, injuries, projections, last season + this season stats, outlooks)
+   + current NBA rosters (team changes). Falls back to the built-in list only if ESPN can't be reached. */
 async function loadPool(){
-  const cached = lsGet('b3h_pool');
-  if (cached){ try{ const c=JSON.parse(cached); if(Date.now()-c.t<12*3600e3 && Object.keys(c.p).length>200){ POOL=c.p; POOL_SRC='ESPN (cached)'; return; } }catch(e){} }
+  const Y = nbaSeasonYear();
+  const cached = lsGet('b3h_pool3');
+  if (cached){ try{ const c=JSON.parse(cached); if(c.y===Y && Date.now()-c.t<6*3600e3 && Object.keys(c.p).length>300){ POOL=c.p; POOL_SRC='ESPN (saved '+new Date(c.t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+')'; return; } }catch(e){} }
   try{
-    const ctl = new AbortController(); setTimeout(()=>ctl.abort(), 9000);
-    const tj = await (await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams',{signal:ctl.signal})).json();
-    const teams = tj.sports[0].leagues[0].teams.map(t=>t.team);
-    const out = {};
-    await Promise.all(teams.map(async t=>{
-      const r = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${t.id}/roster`,{signal:ctl.signal})).json();
-      for (const a of (r.athletes||[])){
-        const items = a.items ? a.items : [a];
-        for (const p of items){
-          out[p.id] = {id:String(p.id), name:p.displayName||p.fullName, team:t.abbreviation, pos:(p.position&&p.position.abbreviation)||'UTIL',
-            rank: RANK_BY_NAME[norm(p.displayName||p.fullName)] || 999, inj:(p.injuries&&p.injuries[0]&&p.injuries[0].status)||''};
-        }
-      }
-    }));
-    if (Object.keys(out).length < 200) throw new Error('small pool');
-    // unranked players get ordered after the ranked list
-    let n = RANKS.length+1; Object.values(out).filter(p=>p.rank===999).sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>p.rank=n++);
-    POOL = out; POOL_SRC = 'ESPN live rosters';
-    lsSet('b3h_pool', JSON.stringify({t:Date.now(), p:out}));
+    const filter = {filterActive:{value:true}, sortDraftRanks:{sortPriority:100,sortAsc:true,value:'STANDARD'}, limit:700,
+      filterStatsForSourceIds:{value:[0,1]}, filterStatsForSplitTypeIds:{value:[0]}, filterStatsForExternalIds:{value:[Y-1, Y]}};
+    const [list, rosters] = await Promise.all([
+      fetchJSON(`https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/${Y}/players?scoringPeriodId=0&view=kona_player_info`, {headers:{'X-Fantasy-Filter':JSON.stringify(filter)}}, 15000),
+      Promise.all(Array.from({length:30},(_,i)=>fetchJSON(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${i+1}/roster`).catch(()=>null)))
+    ]);
+    const ROST = {}, TEAMBYID = {};
+    for (const r of rosters){ if (!r || !r.team) continue; TEAMBYID[r.team.id] = r.team.abbreviation; for (const a of (r.athletes||[])) ROST[a.id] = r.team.abbreviation; }
+    const out = {}; let n = 0;
+    for (const p of list){
+      const pos = (p.eligibleSlots||[]).filter(x=>x<=4).map(x=>ESPN_POS[x]).join('/') || ({1:'PG',2:'SG',3:'SF',4:'PF',5:'C'})[p.defaultPositionId] || 'UTIL';
+      const st = id => (p.stats||[]).find(x=>x.id===id);
+      const rk = p.draftRanksByRankType && p.draftRanksByRankType.STANDARD && p.draftRanksByRankType.STANDARD.rank;
+      out[p.id] = {id:String(p.id), name:p.fullName, team: ROST[p.id] || TEAMBYID[p.proTeamId] || 'FA', pos, rank: rk || (700 + (++n)),
+        adp: p.ownership ? Math.round(p.ownership.averageDraftPosition*10)/10 : null, own: p.ownership ? Math.round(p.ownership.percentOwned) : null,
+        inj: p.injuryStatus && p.injuryStatus!=='ACTIVE' ? p.injuryStatus.replace(/_/g,'-') : '',
+        proj: espnPerGame(st('10'+Y)), cur: espnPerGame(st('00'+Y)), last: espnPerGame(st('00'+(Y-1))), outlook: p.seasonOutlook || ''};
+    }
+    if (Object.keys(out).length < 300) throw new Error('small pool');
+    POOL = out; POOL_SRC = `ESPN live (${Object.keys(out).length} players)`;
+    lsSet('b3h_pool3', JSON.stringify({t:Date.now(), y:Y, p:out}));
   }catch(e){
-    POOL = Object.fromEntries(RANKS.map(p=>[p.id,p])); POOL_SRC = 'Built-in list (ESPN unreachable)';
+    console.warn('ESPN player list failed', e);
+    POOL = Object.fromEntries(RANKS.map(p=>[p.id,p])); POOL_SRC = 'Built-in backup list — ESPN unreachable here (works on GitHub Pages)';
   }
 }
 function pInfo(pid){ if(POOL[pid]) return POOL[pid]; for(const t in S.rosters){ if(S.rosters[t][pid]) return {id:pid,...S.rosters[t][pid]}; } return {id:pid,name:'Unknown',team:'',pos:'',rank:999}; }
@@ -316,6 +338,12 @@ function teamGamesSim(team,w){
 function simLine(pid,info,date){
   const r = rng(hash(pid+'@'+date+'|'+(S.settings.simSeed||1)));
   if (r() < .07) return null; // DNP
+  const base = info.proj || info.last;   // simulate around the player's REAL ESPN projection / last season
+  if (base && base.PTS!==undefined){
+    const f = 0.6 + r()*0.8, j = () => 0.75 + r()*0.5, R0 = x => Math.max(0, Math.round((x||0)*f*j()));
+    const FGA = R0(base.FGA), FGM = Math.min(FGA, R0(base.FGM)), TPA = R0(base['3PA']), TPM = Math.min(TPA, R0(base['3PM'])), FTA = R0(base.FTA), FTM = Math.min(FTA, R0(base.FTM)), REB = R0(base.REB), OREB = Math.min(REB, R0(base.OREB||REB*0.25));
+    return {PTS: 2*(FGM-TPM)+3*TPM+FTM, FGM, FGA, '3PM':TPM, '3PA':TPA, FTM, FTA, REB, OREB, DREB:REB-OREB, AST:R0(base.AST), STL:R0(base.STL), BLK:R0(base.BLK), TO:R0(base.TO), PF:R0(base.PF||2), MIN:Math.round((base.MIN||28)*(0.85+r()*0.3))};
+  }
   const B = Math.max(14, 62 - 0.35*Math.min(info.rank||200,140));
   const pos = info.pos||'';
   const prof = /C/.test(pos)?{reb:.22,ast:.06,stl:.014,blk:.034,tp:.08} : /PG|^G$/.test(pos)?{reb:.075,ast:.165,stl:.026,blk:.006,tp:.38} : {reb:.115,ast:.08,stl:.02,blk:.013,tp:.32};
@@ -472,7 +500,11 @@ const AUTO_MODES = {
   total: {label:'Most total points (season)', desc:'Each day, starts the players with a game and the most fantasy points this season.'},
   games: {label:'Most games this week', desc:'Favors players with the most games this week, then average.'}
 };
-function projAvg(p){ return Math.max(14, 62-0.35*Math.min(p.rank||200,140))*0.85; }
+function projAvg(p){
+  const src = (p.cur && p.cur.GP>=5) ? p.cur : (p.proj || p.last);
+  if (src && S) return fpts(src) + ((S.settings.scoring.DD||0) * (src.DDtot&&src.GP ? src.DDtot/src.GP : 0));
+  return Math.max(14, 62-0.35*Math.min(p.rank||200,140))*0.85;
+}
 /* stats from weeks BEFORE week w only, so an auto lineup never changes after the fact */
 function priorStats(pid,w){
   return memo('ps|'+pid+'|'+w, ()=>{ let n=0,tot=0; for (let k=1;k<w;k++) for (const g of playerGames(pid,k)){ n++; tot+=fpts(g.line); }
@@ -897,7 +929,7 @@ function createLeague(){
   const n = +$('#sTeams').value, teams = {};
   for (let i=0;i<n;i++) teams['t'+i] = {name: DEFAULT_TEAM_NAMES[i] || 'Team '+(i+1)};
   const ids = Object.keys(teams);
-  Store.replace({settings:{...DEFAULT_SETTINGS, name:$('#sName').value||DEFAULT_SETTINGS.name, numTeams:n, leagueType:$('#sType').value}, teams, rosters:{}, lineups:{}, trades:{}, log:{}, draft:{status:'pre', order:ids, picks:{}}, created:Date.now()});
+  Store.replace({settings:{...DEFAULT_SETTINGS, name:$('#sName').value||DEFAULT_SETTINGS.name, numTeams:n, leagueType:$('#sType').value, statsMode: DEMO ? 'sim' : 'live'}, teams, rosters:{}, lineups:{}, trades:{}, log:{}, draft:{status:'pre', order:ids, picks:{}}, created:Date.now()});
   go('draft');
 }
 
@@ -1007,7 +1039,7 @@ function renderPlayerList(){
     let btn = '';
     if (draft) btn = `<button class="btn sm pri" ${myPick?'':'disabled'} onclick="makePick('${p.id}')">Draft</button>`;
     else if (!own && done) btn = myClaims.has(p.id) ? '<span class="tag">Claimed</span>' : `<button class="btn sm pri" onclick="${full?`pickDrop('${p.id}')`:`addPlayer(ME,'${p.id}')`}">${onWaivers(p.id)?'Claim':'Add'}</button>`;
-    return `<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${pLink(p.id)}${p.inj?` <span class="muted small">${esc(p.inj)}</span>`:''}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td>
+    return `<tr><td class="muted">${p.rank>=700?'—':p.rank}</td><td>${pLink(p.id)}${p.inj?` <span class="muted small">${esc(p.inj)}</span>`:''}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td>
     ${draft?'':`<td>${own?esc(tName(own)):onWaivers(p.id)?`<span class="small" style="color:var(--acc2)" title="${esc(waiverText(p.id))}">W</span>`:'<span class="muted">FA</span>'}</td><td class="num">${a===null?'—':fmt(a)}</td>`}<td class="num">${btn}</td></tr>`;}).join('')}</table>`;
 }
 function pickDrop(pid){
@@ -1270,7 +1302,7 @@ function renderMockList(){
   const el = $('#mlist'); if (!el || !MOCK) return;
   const q = norm(ui.mq), pos = ui.mpos||'ALL', myTurn = MOCK.picks.length<mockTotal() && mockTeamAt(MOCK.picks.length)===mockMine();
   const list = mockAvail().filter(p=>(!q||norm(p.name).includes(q))&&(pos==='ALL'||eligible(pos,p.pos))).slice(0,60);
-  el.innerHTML = `<table><tr><th>Rk</th><th>Player</th><th>Pos</th><th>NBA</th><th></th></tr>${list.map(p=>`<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${pLink(p.id)}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td><td class="num"><button class="btn sm pri" ${myTurn?'':'disabled'} onclick="mockPick('${p.id}')">Draft</button></td></tr>`).join('')}</table>`;
+  el.innerHTML = `<table><tr><th>Rk</th><th>Player</th><th>Pos</th><th>NBA</th><th></th></tr>${list.map(p=>`<tr><td class="muted">${p.rank>=700?'—':p.rank}</td><td>${pLink(p.id)}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td><td class="num"><button class="btn sm pri" ${myTurn?'':'disabled'} onclick="mockPick('${p.id}')">Draft</button></td></tr>`).join('')}</table>`;
 }
 function mockToLeague(){
   if (STORE_MODE==='firebase'){ lsSet('b3h_pending_mock','1'); location.href = location.pathname+'?demo=1'; return; }
@@ -1287,19 +1319,19 @@ function mockToLeague(){
 
 /* =================== PLAYER CARD (ESPN-style pop-up) =================== */
 const PCACHE = {};   // ESPN game logs by athlete id + season
-function seasonYear(){ return (parseInt(S.settings.season)||2026)+1; }          // ESPN labels 2026-27 as 2027
 async function fetchGameLog(id, season){
   const key = id+'|'+season; if (PCACHE[key]) return PCACHE[key];
   const j = await (await fetch(`https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${id}/gamelog?season=${season}`)).json();
   const labels = j.labels||[], evs = j.events||{}, out = [];
   for (const st of (j.seasonTypes||[])){
     if (/pre/i.test(st.displayName||'')) continue;
+    const po = /post/i.test(st.displayName||'');
     for (const cat of (st.categories||[])) for (const e of (cat.events||[])){
       const ev = evs[e.eventId]||{}, get = l => { const i = labels.indexOf(l); return i<0 ? '0' : (e.stats||[])[i]; };
       const ma = l => String(get(l)).split('-').map(x=>parseInt(x)||0);
       const [FGM,FGA] = ma('FG'), [TPM,TPA] = ma('3PT'), [FTM,FTA] = ma('FT');
       const line = {PTS:+get('PTS')||0, FGM, FGA, '3PM':TPM, '3PA':TPA, FTM, FTA, REB:+get('REB')||0, AST:+get('AST')||0, STL:+get('STL')||0, BLK:+get('BLK')||0, TO:+get('TO')||0, PF:+get('PF')||0, MIN:parseInt(get('MIN'))||0};
-      if (ev.gameDate) out.push({date: ymd(new Date(ev.gameDate)), opp: `${ev.atVs||''} ${(ev.opponent&&ev.opponent.abbreviation)||''}`.trim(), result: ev.gameResult||'', line});
+      if (ev.gameDate) out.push({date: ymd(new Date(ev.gameDate)), opp: `${ev.atVs||''} ${(ev.opponent&&ev.opponent.abbreviation)||''}`.trim(), result: (ev.gameResult||'')+(po?' · playoffs':''), line});
     }
   }
   out.sort((a,b)=>b.date.localeCompare(a.date));
@@ -1330,18 +1362,28 @@ function upcoming(pid){
   return out;
 }
 let CARD_PID = null;
-function openPlayer(pid){ CARD_PID = pid; ui.cardTab = 'log'; drawPlayer(pid, null); if (S && !isSim() && /^\d+$/.test(pid)) loadCardLive(pid); }
+function openPlayer(pid){ CARD_PID = pid; ui.cardMore = false; drawPlayer(pid, null); if (/^\d+$/.test(pid)) loadCardLive(pid); }
+/* real ESPN game logs: this season (once games start) + last season */
 async function loadCardLive(pid){
-  const y = seasonYear(), res = {};
-  try{ res.cur = await fetchGameLog(pid, y); }catch(e){ res.err = true; }
-  try{ res.prev = await fetchGameLog(pid, y-1); }catch(e){}
+  const y = nbaSeasonYear(), res = {};
+  await Promise.all([
+    fetchGameLog(pid, y).then(x=>res.cur=x).catch(()=>{ res.err = true; }),
+    fetchGameLog(pid, y-1).then(x=>res.prev=x).catch(()=>{ res.err = true; })
+  ]);
   if (CARD_PID===pid) drawPlayer(pid, res);
 }
+/* a season-average row from ESPN per-game numbers */
+function pgRow(pg){ if (!pg || !pg.GP) return null; const ddRate = pg.DDtot ? pg.DDtot/pg.GP : 0, tdRate = pg.TDtot ? pg.TDtot/pg.GP : 0;
+  const fpg = fpts(pg) + ddRate*(S?S.settings.scoring.DD||0:5) + tdRate*(S?S.settings.scoring.TD||0:10);
+  return {GP:pg.GP, MIN:pg.MIN||0, PTS:pg.PTS||0, REB:pg.REB||0, AST:pg.AST||0, STL:pg.STL||0, BLK:pg.BLK||0, TO:pg.TO||0, FPG:fpg, FPTS:fpg*pg.GP}; }
 function drawPlayer(pid, live){
-  const p = pInfo(pid), own = S ? ownerOf(pid) : null, sim = !S || isSim();
-  const log = sim ? (S ? simLog(pid) : []) : (live && live.cur) || [];
-  const prev = !sim && live ? live.prev : null;
-  const A = avgRow(log), P = avgRow(prev), proj = projAvg(p);
+  const p = pInfo(pid), own = S ? ownerOf(pid) : null, sim = !S || isSim(), real = /^\d+$/.test(pid);
+  const Y = nbaSeasonYear(), seasonName = `${Y-1}-${String(Y).slice(2)}`, prevName = `${Y-2}-${String(Y-1).slice(2)}`;
+  // this season: real ESPN game log (live leagues) or the simulated season (sim/test leagues)
+  const curLog = sim ? (S ? simLog(pid) : []) : (live && live.cur) || [];
+  const prevLog = live && live.prev || [];
+  const A = sim ? avgRow(curLog) : (avgRow(curLog) || pgRow(p.cur));
+  const P = pgRow(p.last) || avgRow(prevLog), J = pgRow(p.proj);
   const status = own ? `Manager: <b>${esc(tName(own))}</b>${S.rosters[own][pid].ir?' (IR)':''}` : S && onWaivers(pid) ? `<span style="color:var(--acc2)">${esc(waiverText(pid))}</span>` : 'Free agent';
   let btns = '';
   if (S && S.draft.status==='done'){
@@ -1350,25 +1392,29 @@ function drawPlayer(pid, live){
     else btns = `<button class="btn" onclick="closeModal();ui.tradeWith='${own}';ui.tradeGet=new Set(['${pid}']);go('trades')">Propose trade</button>`;
   }
   const avgCells = a => a ? `<td class="num">${a.GP}</td><td class="num">${fmt(a.MIN)}</td><td class="num">${fmt(a.PTS)}</td><td class="num">${fmt(a.REB)}</td><td class="num">${fmt(a.AST)}</td><td class="num">${fmt(a.STL)}</td><td class="num">${fmt(a.BLK)}</td><td class="num">${fmt(a.TO)}</td><td class="num"><b>${fmt(a.FPG)}</b></td><td class="num">${Math.round(a.FPTS)}</td>` : `<td colspan="10" class="muted small">No games yet</td>`;
-  const seasonName = S ? S.settings.season : '2026-27', prevName = `${(parseInt(seasonName)||2026)-1}-${String((parseInt(seasonName)||2026)).slice(2)}`;
-  const up = S ? upcoming(pid) : [];
-  const w = S ? curWeek() : 1, wkGames = S ? gamesThisWeek(pid,w) : 0;
-  const headshot = /^\d+$/.test(pid) ? `<img src="https://a.espncdn.com/i/headshots/nba/players/full/${pid}.png" alt="" onerror="this.outerHTML='<div class=&quot;pc-ph&quot;>${esc(p.name.split(' ').map(x=>x[0]).join('').slice(0,2))}</div>'">` : `<div class="pc-ph">${esc(p.name.split(' ').map(x=>x[0]).join('').slice(0,2))}</div>`;
+  const up = S ? upcoming(pid) : [], w = S ? curWeek() : 1, wkGames = S ? gamesThisWeek(pid,w) : 0;
+  const ini = esc(p.name.split(' ').map(x=>x[0]).join('').slice(0,2));
+  const headshot = real ? `<img src="https://a.espncdn.com/i/headshots/nba/players/full/${pid}.png" alt="" onerror="this.outerHTML='<div class=&quot;pc-ph&quot;>${ini}</div>'">` : `<div class="pc-ph">${ini}</div>`;
+  const logRows = (log, withYear, tag) => log.map(g=>`<tr><td>${+g.date.slice(4,6)}/${+g.date.slice(6)}${withYear?'/'+g.date.slice(2,4):''}</td><td>${esc(g.opp)} <span class="muted small">${esc(g.result)}</span></td><td class="num">${g.line.MIN||'—'}</td><td class="num">${g.line.PTS}</td><td class="num">${g.line.REB}</td><td class="num">${g.line.AST}</td><td class="num">${g.line.STL}</td><td class="num">${g.line.BLK}</td><td class="num">${g.line.TO}</td><td class="num"><b>${fmt(fpts(g.line))}</b></td><td>${tag&&S?fantasyTag(pid,g.date):''}</td></tr>`).join('');
+  const logHead = `<tr><th>Date</th><th>Opp</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num">FPTS</th><th>Fantasy</th></tr>`;
+  const n = ui.cardMore ? 82 : 10;
   const html = `<div class="row" style="justify-content:space-between;align-items:flex-start"><div class="pc-head">${headshot}
-      <div><div style="font-size:22px;font-weight:900">${esc(p.name)}</div><div class="muted">${esc(p.team)} · <span class="pos">${esc(p.pos)}</span>${p.rank&&p.rank<=RANKS.length?` · Rank #${p.rank}`:''}</div>
+      <div><div style="font-size:22px;font-weight:900">${esc(p.name)}</div><div class="muted">${esc(p.team)} · <span class="pos">${esc(p.pos)}</span>${p.rank&&p.rank<700?` · ESPN rank #${p.rank}`:''}${p.adp?` · ADP ${p.adp}`:''}${p.own!=null?` · ${p.own}% rostered`:''}</div>
       <div class="small" style="margin-top:4px">${p.inj?`<span class="inj">${esc(p.inj.toUpperCase())}</span> `:''}${status}</div></div></div>
       <button class="btn sm" onclick="closeModal()">✕</button></div>
     <div class="row" style="margin:12px 0">${btns}</div>
-    <div class="card" style="background:var(--panel2)"><b>Best-3 outlook — Week ${w}:</b> ${wkGames} NBA game${wkGames===1?'':'s'} this week${wkGames>S?.settings.gameCap?` (only his best ${S.settings.gameCap} count)`:''}. Next 7 days: ${up.length?up.join(' · '):'no games'}.</div>
-    <h3>Stats</h3><div class="tw"><table><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num">FP/G</th><th class="num">FPTS</th></tr>
-      <tr><td>${esc(seasonName)}${sim?' <span class="muted small">(sim)</span>':''}</td>${avgCells(A)}</tr>
-      ${!sim?`<tr><td>${esc(prevName)}</td>${live?avgCells(P):'<td colspan="10" class="muted small">Loading…</td>'}</tr>`:''}
-      <tr><td>Projected</td><td colspan="8" class="muted small">based on preseason rank</td><td class="num"><b>${fmt(proj)}</b></td><td class="num">${Math.round(proj*72)}</td></tr></table></div>
-    <h3>Game log</h3>${!sim&&!live?'<p class="muted small">Loading ESPN game log…</p>':''}${live&&live.err?'<p class="muted small">Couldn\'t reach ESPN for this player\'s game log.</p>':''}
-    <div class="tw"><table><tr><th>Date</th><th>Opp</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num">FPTS</th><th>Fantasy</th></tr>
-      ${log.slice(0, ui.cardMore?60:10).map(g=>`<tr><td>${+g.date.slice(4,6)}/${+g.date.slice(6)}</td><td>${esc(g.opp)} <span class="muted small">${esc(g.result)}</span></td><td class="num">${g.line.MIN||'—'}</td><td class="num">${g.line.PTS}</td><td class="num">${g.line.REB}</td><td class="num">${g.line.AST}</td><td class="num">${g.line.STL}</td><td class="num">${g.line.BLK}</td><td class="num">${g.line.TO}</td><td class="num"><b>${fmt(fpts(g.line))}</b></td><td>${S?fantasyTag(pid,g.date):''}</td></tr>`).join('') || `<tr><td colspan="11" class="muted small">No games played yet this season${prev&&prev.length?' — last season below':''}.</td></tr>`}
-      ${!log.length&&prev&&prev.length?prev.slice(0,10).map(g=>`<tr class="muted"><td>${+g.date.slice(4,6)}/${+g.date.slice(6)}/${g.date.slice(2,4)}</td><td>${esc(g.opp)}</td><td class="num">${g.line.MIN}</td><td class="num">${g.line.PTS}</td><td class="num">${g.line.REB}</td><td class="num">${g.line.AST}</td><td class="num">${g.line.STL}</td><td class="num">${g.line.BLK}</td><td class="num">${g.line.TO}</td><td class="num">${fmt(fpts(g.line))}</td><td></td></tr>`).join(''):''}
-    </table></div>${log.length>10&&!ui.cardMore?`<div class="row" style="justify-content:center;margin-top:8px"><button class="btn sm" onclick="ui.cardMore=true;drawPlayer('${pid}',${live?'LIVE_CARD':'null'})">Show more</button></div>`:''}`;
+    ${S?`<div class="card" style="background:var(--panel2)"><b>Best-3 outlook — Week ${w}:</b> ${wkGames} NBA game${wkGames===1?'':'s'} this week${wkGames>S.settings.gameCap?` (only his best ${S.settings.gameCap} count)`:''}. Next 7 days: ${up.length?up.join(' · '):'no games'}.</div>`:''}
+    <h3>Stats <span class="muted small" style="text-transform:none;letter-spacing:0">fantasy points use your league's scoring</span></h3><div class="tw"><table><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num">FP/G</th><th class="num">FPTS</th></tr>
+      <tr><td>${seasonName}${sim?' <span class="small" style="color:var(--acc2)">(simulated test season)</span>':''}</td>${avgCells(A)}</tr>
+      <tr><td>${prevName} <span class="muted small">(real)</span></td>${P?avgCells(P):`<td colspan="10" class="muted small">${real?(live?'Didn\'t play':'Loading…'):'Not available offline'}</td>`}</tr>
+      <tr><td>${seasonName} ESPN projection</td>${J?avgCells(J):`<td colspan="8" class="muted small">based on rank</td><td class="num"><b>${fmt(projAvg(p))}</b></td><td></td>`}</tr></table></div>
+    ${p.outlook?`<h3>Outlook</h3><p style="line-height:1.55">${esc(p.outlook)}</p>`:''}
+    <h3>${seasonName} game log${sim?' <span class="small" style="color:var(--acc2);text-transform:none;letter-spacing:0">(simulated)</span>':''}</h3>
+    ${!sim&&real&&!live?'<p class="muted small">Loading ESPN game log…</p>':''}
+    <div class="tw"><table>${logHead}${logRows(curLog.slice(0,n), false, true) || `<tr><td colspan="11" class="muted small">No ${seasonName} games yet${sim?'':' — the NBA season starts soon'}.</td></tr>`}</table></div>
+    <h3>${prevName} game log <span class="muted small" style="text-transform:none;letter-spacing:0">(real, from ESPN)</span></h3>
+    ${real ? (live ? (prevLog.length ? `<div class="tw"><table>${logHead}${logRows(prevLog.slice(0,n), true, false)}</table></div>` : `<p class="muted small">${live.err?'Couldn\'t reach ESPN for his game log right now.':'No games last season.'}</p>`) : '<p class="muted small">Loading ESPN game log…</p>') : '<p class="muted small">Player list is offline here, so no ESPN data. Open the site from GitHub Pages.</p>'}
+    ${(curLog.length>10||prevLog.length>10)&&!ui.cardMore?`<div class="row" style="justify-content:center;margin-top:8px"><button class="btn sm" onclick="ui.cardMore=true;drawPlayer('${pid}',window.LIVE_CARD)">Show full game logs</button></div>`:''}`;
   window.LIVE_CARD = live;
   $('#modalBody').classList.add('wide'); openModal(html);
 }
