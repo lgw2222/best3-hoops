@@ -62,6 +62,7 @@ td.num,th.num{text-align:right}
 .board .hd{background:none;font-weight:800;color:var(--acc2);min-height:0;text-align:center}
 .board .me{outline:1px solid var(--acc)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid2>*{min-width:0}
 @media(max-width:760px){.grid2{grid-template-columns:1fr}.mu .s{font-size:19px}}
 .tag{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--panel2);color:var(--mute);font-weight:700}
 .tag.live{color:var(--good)}
@@ -94,16 +95,25 @@ const LEAGUE_ID = 'main';
 const DEMO = /[?&]demo=1/.test(location.search);   // add ?demo=1 to the URL for a private sandbox that never touches the real league
 
 const DEFAULT_SETTINGS = {
-  name: 'Best of 3 League', numTeams: 10, rosterSize: 13,
+  name: 'Bronny James', numTeams: 8, rosterSize: 15, irSlots: 4,
   slots: ['PG','SG','SF','PF','C','G','F','UTIL','UTIL','UTIL'],
   scoring: {PTS:1, FGM:1, REB:1, AST:1, STL:1, BLK:1, TO:-1, DD:5, TD:10},
-  gameCap: 3, regWeeks: 20, statsMode: 'sim', simWeek: 2, simDay: 3, simSeed: 1,
+  gameCap: 3, statsMode: 'sim', simWeek: 2, simDay: 3, simSeed: 1,
+  lineupLock: 'game',                       // 'game' = each player locks at his tip-off (ESPN), 'day' = whole day locks at first tip
+  acqSystem: 'waivers', waiverDays: 1, addsPerWeek: 7,
+  tradeReviewDays: 2, vetoVotes: 4, tradeDeadline: '',
+  regWeeks: 19, playoffTeams: 4, playoffRoundWeeks: 2, champRoundWeeks: 2, consolation: true,
+  draftType: 'snake', pickSeconds: 30,
   leagueType: 'redraft', keepers: 3, keeperCost: 'round', rookieRounds: 3, season: '2026-27', seasonStart: '20261020'
 };
+const DEFAULT_TEAM_NAMES = ['The First No Joel','The Washed All Stars',"Rock 'Em, Siakam Robots",'Cade and Em','Disgruntled Mavs Fan','Team zarate','Points Against Merchant','AI BoT FoRtNiTE'];
 const LEAGUE_TYPES = {redraft:'Redraft (new draft every season)', keeper:'Keeper (keep a few players each season)', dynasty:'Dynasty (keep your whole roster + rookie draft)'};
 const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-const STAT_LABELS = {PTS:'Points',FGM:'Field Goals Made',REB:'Rebounds',AST:'Assists',STL:'Steals',BLK:'Blocks',TO:'Turnovers',DD:'Double-Double',TD:'Triple-Double'};
-const ELIG = {PG:['PG','G'],SG:['SG','G'],SF:['SF','F'],PF:['PF','F'],C:['C'],G:['PG','SG','G'],F:['SF','PF','F'],UTIL:null};
+const STAT_LABELS = {PTS:'Points',FGM:'Field Goals Made',FGA:'Field Goals Attempted',FGMI:'Field Goals Missed',FTM:'Free Throws Made',FTA:'Free Throws Attempted',FTMI:'Free Throws Missed',
+  '3PM':'Three Pointers Made','3PA':'Three Pointers Attempted','3PMI':'Three Pointers Missed',OREB:'Offensive Rebounds',DREB:'Defensive Rebounds',REB:'Rebounds',AST:'Assists',STL:'Steals',BLK:'Blocks',
+  TO:'Turnovers',PF:'Personal Fouls',MIN:'Minutes',DD:'Double-Double',TD:'Triple-Double',QD:'Quadruple-Double'};
+const SLOT_TYPES = ['PG','SG','SF','PF','C','G','F','SG/SF','G/F','PF/C','F/C','UTIL'];
+const ELIG = {PG:['PG','G'],SG:['SG','G'],SF:['SF','F'],PF:['PF','F'],C:['C'],G:['PG','SG','G'],F:['SF','PF','F'],'SG/SF':['SG','SF','G','F'],'G/F':['PG','SG','SF','PF','G','F'],'PF/C':['PF','C','F'],'F/C':['SF','PF','C','F'],UTIL:null};
 const NBA = ['ATL','BOS','BKN','CHA','CHI','CLE','DAL','DEN','DET','GS','HOU','IND','LAC','LAL','MEM','MIA','MIL','MIN','NOP','NYK','OKC','ORL','PHI','PHX','POR','SAC','SA','TOR','UTA','WAS'];
 
 /* Rank list for ordering the player pool (also the offline fallback pool; teams approximate). */
@@ -131,17 +141,18 @@ function weekStart(w){ const s=seasonStartDate(); if (w===1) return s; const d=n
 function weekDates(w){ const s=weekStart(w), out=[]; for(let i=0;i<weekLen(w);i++){ const d=new Date(s); d.setDate(s.getDate()+i); out.push(ymd(d)); } return out; }
 function weekLabel(w){ const s=weekStart(w), e=new Date(s); e.setDate(s.getDate()+weekLen(w)-1); const f=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); return `Week ${w} · ${f(s)}–${f(e)}`; }
 const todayStr = () => ymd(new Date());
-function liveWeek(){ const t=todayStr(); for(let w=1;w<=S.settings.regWeeks;w++){ const d=weekDates(w); if(t<=d[d.length-1]) return w; } return S.settings.regWeeks; }
+function totalWeeks(){ return S.settings.regWeeks + playoffRounds().reduce((a,r)=>a+r.weeks.length,0); }
+function liveWeek(){ const t=todayStr(); for(let w=1;w<=totalWeeks();w++){ const d=weekDates(w); if(t<=d[d.length-1]) return w; } return totalWeeks(); }
 const isSim = () => S.settings.statsMode==='sim';
-function curWeek(){ if(!isSim()) return liveWeek(); const s=S.settings; return Math.max(1, Math.min(s.regWeeks, s.simWeek + (s.simDay>0?1:0))); }
+function curWeek(){ if(!isSim()) return liveWeek(); const s=S.settings; return Math.max(1, Math.min(totalWeeks(), s.simWeek + (s.simDay>0?1:0))); }
 function weekLocked(w){ const s=S.settings; return isSim()? (w<=s.simWeek || (w===s.simWeek+1 && s.simDay>0)) : todayStr()>=weekDates(w)[0]; }
 /* how many days of week w have been "played" in sim mode */
 function simDaysPlayed(w){ const s=S.settings; if(w<=s.simWeek) return weekLen(w); if(w===s.simWeek+1) return Math.min(s.simDay, weekLen(w)); return 0; }
 const dayName = d => DAY_NAMES[(new Date(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6)).getDay()+6)%7];
-function simStatus(){ const s=S.settings; if(s.simWeek>=s.regWeeks) return 'Regular season complete'; const w=s.simWeek+1; return s.simDay>0 ? `Week ${w}, games played through ${dayName(weekDates(w)[s.simDay-1])}` : `Start of Week ${w} — no games played yet`; }
-function simAdvanceDay(){ const s=S.settings; if(s.simWeek>=s.regWeeks) return; let w=s.simWeek, d=s.simDay+1; if(d>=weekLen(w+1)){ w++; d=0; } Store.update({'settings/simWeek':w,'settings/simDay':d}); }
-function simFinishWeek(){ const s=S.settings; if(s.simWeek>=s.regWeeks) return; Store.update({'settings/simWeek':s.simWeek+1,'settings/simDay':0}); }
-function simSet(w,d){ Store.update({'settings/simWeek':Math.max(0,Math.min(S.settings.regWeeks,w)),'settings/simDay':d}); ui.week=null; }
+function simStatus(){ const s=S.settings; if(s.simWeek>=totalWeeks()) return 'Season complete (incl. playoffs)'; const w=s.simWeek+1; return s.simDay>0 ? `Week ${w}, games played through ${dayName(weekDates(w)[s.simDay-1])}` : `Start of Week ${w} — no games played yet`; }
+function simAdvanceDay(){ const s=S.settings; if(s.simWeek>=totalWeeks()) return; let w=s.simWeek, d=s.simDay+1; if(d>=weekLen(w+1)){ w++; d=0; } Store.update({'settings/simWeek':w,'settings/simDay':d}); processPending(true); }
+function simFinishWeek(){ const s=S.settings; if(s.simWeek>=totalWeeks()) return; Store.update({'settings/simWeek':s.simWeek+1,'settings/simDay':0}); processPending(true); }
+function simSet(w,d){ Store.update({'settings/simWeek':Math.max(0,Math.min(totalWeeks(),w)),'settings/simDay':d}); ui.week=null; }
 function weekDone(w){ if(isSim()) return w<=S.settings.simWeek; const d=weekDates(w); return todayStr()>d[d.length-1]; }
 
 /* ---------- store (Firebase or local demo) ---------- */
@@ -149,7 +160,7 @@ let S = null, STORE_MODE = 'local', fbRef = null, bkRef = null, bc = null, LOADE
 const LS_KEY = 'b3h_'+(DEMO?'demo':'local');
 const MIRROR_KEY = 'b3h_mirror_'+LEAGUE_ID;
 function setPath(obj,path,val){ const k=path.split('/'); let o=obj; for(let i=0;i<k.length-1;i++){ if(typeof o[k[i]]!=='object'||o[k[i]]===null) o[k[i]]={}; o=o[k[i]]; } if(val===null||val===undefined) delete o[k[k.length-1]]; else o[k[k.length-1]]=val; }
-function normalize(x){ if(!x||!x.settings) return null; x.settings={...DEFAULT_SETTINGS,...x.settings}; x.settings.scoring={...DEFAULT_SETTINGS.scoring,...(x.settings.scoring||{})}; for(const k of ['teams','rosters','lineups','trades','log','keepers','history']) x[k]=x[k]||{}; x.draft=x.draft||{status:'pre',order:Object.keys(x.teams),picks:{}}; x.draft.picks=x.draft.picks||{}; x.draft.order=x.draft.order||Object.keys(x.teams); return x; }
+function normalize(x){ if(!x||!x.settings) return null; x.settings={...DEFAULT_SETTINGS,...x.settings}; x.settings.scoring={...DEFAULT_SETTINGS.scoring,...(x.settings.scoring||{})}; for(const k of ['teams','rosters','lineups','trades','log','keepers','history','waivers','claims','adds']) x[k]=x[k]||{}; x.draft=x.draft||{status:'pre',order:Object.keys(x.teams),picks:{}}; x.draft.picks=x.draft.picks||{}; x.draft.order=x.draft.order||Object.keys(x.teams); return x; }
 const clone = o => JSON.parse(JSON.stringify(o));
 const Store = {
   async init(){
@@ -199,7 +210,12 @@ const Store = {
     }
     S = normalize(obj); this._save(); render();
   },
-  _save(){ lsSet(LS_KEY, JSON.stringify(S)); try{ bc && bc.postMessage(1); }catch(e){} }
+  _save(){ lsSet(LS_KEY, JSON.stringify(S)); try{ bc && bc.postMessage(1); }catch(e){} },
+  /* only one device at a time gets to run a job (waivers, auto-pick); others skip */
+  async lock(key, ms){
+    if (STORE_MODE!=='firebase') return true;
+    try{ const r = await fbRef.child('locks/'+key).transaction(cur => (cur && Date.now()-cur < ms) ? undefined : Date.now()); return r.committed; }catch(e){ return false; }
+  }
 };
 /* ---------- backups: cloud checkpoints + file export ---------- */
 async function checkpoint(reason, keep){
@@ -273,7 +289,10 @@ async function loadPool(){
 }
 function pInfo(pid){ if(POOL[pid]) return POOL[pid]; for(const t in S.rosters){ if(S.rosters[t][pid]) return {id:pid,...S.rosters[t][pid]}; } return {id:pid,name:'Unknown',team:'',pos:'',rank:999}; }
 function ownerOf(pid){ for(const t in S.rosters) if(S.rosters[t][pid]) return t; return null; }
-const rosterIds = t => Object.keys(S.rosters[t]||{}).sort((a,b)=>pInfo(a).rank-pInfo(b).rank);
+const allRosterIds = t => Object.keys(S.rosters[t]||{}).sort((a,b)=>pInfo(a).rank-pInfo(b).rank);
+const rosterIds = t => allRosterIds(t).filter(p=>!S.rosters[t][p].ir);          // active players (not on IR)
+const irIds = t => allRosterIds(t).filter(p=>S.rosters[t][p].ir);
+const activeCount = t => rosterIds(t).length;
 const teamIds = () => Object.keys(S.teams).sort((a,b)=>+a.slice(1)-+b.slice(1));
 const tName = t => (S.teams[t]&&S.teams[t].name)||t;
 const snap = p => ({name:p.name, team:p.team, pos:p.pos, rank:p.rank});
@@ -290,18 +309,21 @@ function simLine(pid,info,date){
   if (r() < .07) return null; // DNP
   const B = Math.max(14, 62 - 0.35*Math.min(info.rank||200,140));
   const pos = info.pos||'';
-  const prof = /C/.test(pos)?{reb:.22,ast:.06,stl:.014,blk:.034} : /PG|^G$/.test(pos)?{reb:.075,ast:.165,stl:.026,blk:.006} : {reb:.115,ast:.08,stl:.02,blk:.013};
+  const prof = /C/.test(pos)?{reb:.22,ast:.06,stl:.014,blk:.034,tp:.08} : /PG|^G$/.test(pos)?{reb:.075,ast:.165,stl:.026,blk:.006,tp:.38} : {reb:.115,ast:.08,stl:.02,blk:.013,tp:.32};
   const f = 0.55 + r()*0.9, j = () => 0.7 + r()*0.6;
-  const PTS = Math.round(B*.4*f*j()), FGM = Math.round(PTS*.37*j());
-  return {PTS, FGM, REB:Math.round(B*prof.reb*f*j()), AST:Math.round(B*prof.ast*f*j()), STL:Math.round(B*prof.stl*f*j()*1.2), BLK:Math.round(B*prof.blk*f*j()*1.2), TO:Math.round(B*.045*f*j())};
+  const PTS = Math.round(B*.4*f*j()), FGM = Math.round(PTS*.37*j()), FGA = Math.max(FGM, Math.round(FGM/(0.42+r()*0.14)));
+  const TPA = Math.round(FGA*prof.tp*j()), TPM = Math.min(TPA, Math.round(TPA*(0.28+r()*0.16))), FTA = Math.round(PTS*.22*j()), FTM = Math.min(FTA, Math.round(FTA*(0.68+r()*0.2)));
+  const REB = Math.round(B*prof.reb*f*j()), OREB = Math.round(REB*(0.15+r()*0.2));
+  return {PTS, FGM, FGA, '3PM':TPM, '3PA':TPA, FTM, FTA, REB, OREB, DREB:REB-OREB, AST:Math.round(B*prof.ast*f*j()), STL:Math.round(B*prof.stl*f*j()*1.2), BLK:Math.round(B*prof.blk*f*j()*1.2),
+    TO:Math.round(B*.045*f*j()), PF:Math.round(r()*4.5), MIN:Math.round(18+B*.3*f*j())};
 }
 const LIVE = {}; // date -> {byId, byName, done}
 const SCHED = {}; // date -> [team abbrs playing that day] (live mode)
 const TIP = {};   // date -> earliest tip-off time (ms)
 const GI = {};    // date -> {TEAM: {opp, status, state, score}}
-function giFrom(sb){ const out={}; for(const ev of (sb.events||[])){ const comp=(ev.competitions||[])[0]||{}, cs=comp.competitors||[], st=(ev.status&&ev.status.type)||{};
+function giFrom(sb){ const out={}; for(const ev of (sb.events||[])){ const comp=(ev.competitions||[])[0]||{}, cs=comp.competitors||[], st=(ev.status&&ev.status.type)||{}, tip=Date.parse(ev.date)||0;
   const sc = cs.map(c=>`${c.team&&c.team.abbreviation} ${c.score||''}`).join(' – ');
-  for (const c of cs){ const ab=c.team&&c.team.abbreviation, o=cs.find(x=>x!==c); out[ab]={opp:(c.homeAway==='home'?'vs ':'@ ')+(o&&o.team&&o.team.abbreviation||''), status:st.shortDetail||'', state:st.state||'pre', score: st.state==='pre'?'':sc}; } } return out; }
+  for (const c of cs){ const ab=c.team&&c.team.abbreviation, o=cs.find(x=>x!==c); out[ab]={opp:(c.homeAway==='home'?'vs ':'@ ')+(o&&o.team&&o.team.abbreviation||''), status:st.shortDetail||'', state:st.state||'pre', tip, score: st.state==='pre'?'':sc}; } } return out; }
 function tipFrom(sb,d){ const ts=(sb.events||[]).map(e=>Date.parse(e.date)).filter(x=>x>0); if(ts.length){ TIP[d]=Math.min(...ts); lsSet('b3h_tip_'+d, String(TIP[d])); } }
 function schedFrom(sb){ const out=[]; for(const ev of (sb.events||[])) for(const c of (((ev.competitions||[])[0]||{}).competitors||[])) if(c.team) out.push(c.team.abbreviation); return out; }
 /* number of NBA games a player's team has in week w */
@@ -342,20 +364,29 @@ function parseBox(sum, day, date, live){
       for (const a of (st.athletes||[])){
         if (!a.stats || !a.stats.length || a.didNotPlay) continue;
         const get = (k,l) => { let i=keys.indexOf(k); if(i<0) i=labels.indexOf(l); return i<0?'0':a.stats[i]; };
-        const line = {PTS:+get('points','PTS')||0, FGM:parseInt(get('fieldGoalsMade-fieldGoalsAttempted','FG'))||0, REB:+get('rebounds','REB')||0,
-          AST:+get('assists','AST')||0, STL:+get('steals','STL')||0, BLK:+get('blocks','BLK')||0, TO:+get('turnovers','TO')||0};
+        const ma = (k,l) => String(get(k,l)).split('-').map(x=>parseInt(x)||0);
+        const [FGM,FGA] = ma('fieldGoalsMade-fieldGoalsAttempted','FG'), [TPM,TPA] = ma('threePointFieldGoalsMade-threePointFieldGoalsAttempted','3PT'), [FTM,FTA] = ma('freeThrowsMade-freeThrowsAttempted','FT');
+        const line = {PTS:+get('points','PTS')||0, FGM, FGA, '3PM':TPM, '3PA':TPA, FTM, FTA, REB:+get('rebounds','REB')||0, OREB:+get('offensiveRebounds','OREB')||0, DREB:+get('defensiveRebounds','DREB')||0,
+          AST:+get('assists','AST')||0, STL:+get('steals','STL')||0, BLK:+get('blocks','BLK')||0, TO:+get('turnovers','TO')||0, PF:+get('fouls','PF')||0, MIN:parseInt(get('minutes','MIN'))||0};
         const g = {date, opp, line, live};
         day.byId[a.athlete.id] = g; day.byName[norm(a.athlete.displayName)] = g;
       }
     }
   }
 }
+function statVal(line,k){
+  if (k==='FGMI') return (line.FGA||0)-(line.FGM||0);
+  if (k==='FTMI') return (line.FTA||0)-(line.FTM||0);
+  if (k==='3PMI') return (line['3PA']||0)-(line['3PM']||0);
+  return line[k]||0;
+}
 function fpts(line){
   const sc = S.settings.scoring; let p = 0;
-  for (const k of ['PTS','FGM','REB','AST','STL','BLK','TO']) p += (line[k]||0)*(sc[k]||0);
+  for (const k in sc){ if (k==='DD'||k==='TD'||k==='QD'||!sc[k]) continue; p += statVal(line,k)*sc[k]; }
   const tens = ['PTS','REB','AST','STL','BLK'].filter(k=>(line[k]||0)>=10).length;
   if (tens>=2) p += sc.DD||0;
   if (tens>=3) p += sc.TD||0;
+  if (tens>=4) p += sc.QD||0;
   return p;
 }
 function playerGames(pid,w){
@@ -381,6 +412,15 @@ function dayLocked(d){
 function teamPlays(team,d){ if(isSim()) return memo('tp|'+team+'|'+d, ()=>teamGamesSim(team,weekOfDate(d)).some(g=>g.date===d)); return !!(SCHED[d]&&SCHED[d].includes(team)); }
 const plays = (pid,d) => teamPlays(pInfo(pid).team, d);
 function oppOn(pid,d){ if(!isSim()) return ''; const g=teamGamesSim(pInfo(pid).team,weekOfDate(d)).find(g=>g.date===d); return g?g.opp:''; }
+/* ESPN-style: a player locks when HIS game tips off (or the whole day, if the league uses day locks) */
+function playerLocked(pid,d){
+  if (isSim() || S.settings.lineupLock==='day') return dayLocked(d);
+  const t=todayStr(); if (d<t) return true; if (d>t) return false;
+  const g = GI[d] && GI[d][pInfo(pid).team]; if (!g) return dayLocked(d);
+  return g.state!=='pre' || (g.tip && Date.now()>=g.tip);
+}
+/* can anything still change on day d? */
+function dayOpen(d){ if (isSim() || S.settings.lineupLock==='day') return !dayLocked(d); return d>=todayStr(); }
 /* the stat line a player put up on day d (null if no game / not played yet / DNP) */
 function gameOn(pid,d){
   const info = pInfo(pid);
@@ -440,11 +480,12 @@ function autoMetric(pid,w,mode){
 /* Place players in priority order. If a player's slots are full, it tries shuffling the players already placed
    (e.g. move a guard from PG to G) to make room — so the most high-priority players possible end up starting.
    Players who have a game today are always ahead of players who don't, so an idle starter never blocks an active bench player. */
-function fillSlots(ids){
-  const slots = S.settings.slots, lu = slots.map(()=>null), tight = s => ELIG[s]?ELIG[s].length:99;
+function fillSlots(ids, fixed){
+  const slots = S.settings.slots, lu = slots.map((s,i)=>fixed&&fixed[i]||null), tight = s => ELIG[s]?ELIG[s].length:99;
+  const pinned = new Set(lu.map((p,i)=>p?i:-1).filter(i=>i>=0));
   const order = slots.map((s,i)=>i).sort((a,b)=>tight(slots[a])-tight(slots[b]));
   const tryPlace = (p, seen) => {
-    for (const i of order){ if (seen.has(i) || !eligible(slots[i],pInfo(p).pos)) continue; seen.add(i);
+    for (const i of order){ if (seen.has(i) || pinned.has(i) || !eligible(slots[i],pInfo(p).pos)) continue; seen.add(i);
       if (!lu[i] || tryPlace(lu[i], seen)){ lu[i] = p; return true; } }
     return false;
   };
@@ -452,7 +493,15 @@ function fillSlots(ids){
   return lu;
 }
 /* one-tap fix for a single day: bench idle starters for active bench players, keeping the best (by chosen method) */
-function startActive(t,d,mode){ Store.update({['lineups/'+t+'/d'+d]: luObj(autoDay(t,d,mode||lsGet('b3h_automode')||'proj'))}); }
+/* auto lineup for a day that may already be underway: players whose games started stay exactly where they are */
+function autoDayLive(t,d,mode){
+  const cur = lineupForDay(t,d), fixed = cur.map(p=>p&&playerLocked(p,d)?p:null);
+  if (!fixed.some(Boolean)) return autoDay(t,d,mode);
+  const ideal = autoDay(t,d,mode).filter(Boolean), keep = new Set(fixed.filter(Boolean));
+  const benchLocked = new Set(rosterIds(t).filter(p=>!cur.includes(p)&&playerLocked(p,d)));
+  return fillSlots(ideal.concat(rosterIds(t)).filter((p,i,a)=>a.indexOf(p)===i && !keep.has(p) && !benchLocked.has(p)), fixed);
+}
+function startActive(t,d,mode){ Store.update({['lineups/'+t+'/d'+d]: luObj(autoDayLive(t,d,mode||lsGet('b3h_automode')||'proj'))}); }
 function autoDay(t,d,mode){
   return memo('ad|'+t+'|'+d+'|'+mode, ()=>{
     const w = weekOfDate(d), ds = weekDates(w), idx = ds.indexOf(d), cap = S.settings.gameCap, used = {};
@@ -464,7 +513,7 @@ function autoDay(t,d,mode){
 function cleanLineup(t,saved,trust){
   const lu = S.settings.slots.map((s,i)=>saved[i]||null);
   if (trust) return lu;                       // a saved lineup for a day that already happened is history — keep it exactly
-  const ros = new Set(Object.keys(S.rosters[t]||{}));
+  const ros = new Set(rosterIds(t));
   const out = lu.map(p=>p&&ros.has(p)?p:null), used = new Set(out.filter(Boolean));
   out.forEach((p,i)=>{ if(!p){ const b=rosterIds(t).find(x=>!used.has(x)&&eligible(S.settings.slots[i],pInfo(x).pos)); if(b){ out[i]=b; used.add(b);} } });
   return out;
@@ -492,24 +541,63 @@ function freezeLineups(t,u){
 function luObj(lu){ const o={}; lu.forEach((p,k)=>{ if(p) o[k]=p; }); return o; }
 function autoSet(t,w,mode){
   const u = {}, L = S.lineups[t] = S.lineups[t]||{};
-  for (const d of weekDates(w)){ if (dayLocked(d)) continue; /* never rewrite days that already happened */ MEMO.clear(); const o = luObj(autoDay(t,d,mode)); L['d'+d] = o; u['lineups/'+t+'/d'+d] = o; }
+  for (const d of weekDates(w)){ if (!dayOpen(d)) continue; /* never rewrite days that already happened */ MEMO.clear(); const o = luObj(autoDayLive(t,d,mode)); L['d'+d] = o; u['lineups/'+t+'/d'+d] = o; }
   Store.update(u);
 }
 
 /* ---------- schedule / standings ---------- */
 function roundRobin(ids){ let a=ids.slice(); if(a.length%2) a.push(null); const n=a.length, rounds=[]; for(let r=0;r<n-1;r++){ const pr=[]; for(let i=0;i<n/2;i++) pr.push([a[i],a[n-1-i]]); rounds.push(pr); a=[a[0],a[n-1],...a.slice(1,n-1)]; } return rounds; }
-function matchups(w){ const rr = roundRobin(teamIds()); return rr[(w-1)%rr.length].filter(p=>p[0]&&p[1]); }
+function playoffRounds(){
+  const s = S.settings, n = s.playoffTeams||0; if (n<2) return [];
+  const rounds = n<=2?1 : n<=4?2 : 3, out = []; let w = s.regWeeks+1;
+  for (let r=1;r<=rounds;r++){ const len = r===rounds ? (s.champRoundWeeks||1) : (s.playoffRoundWeeks||1); out.push({r, weeks:Array.from({length:len},(_,i)=>w+i), final:r===rounds}); w += len; }
+  return out;
+}
+function regMatchups(w){ const rr = roundRobin(teamIds()); return rr[(w-1)%rr.length].filter(p=>p[0]&&p[1]); }
 function standings(){
-  const st = {}; teamIds().forEach(t=>st[t]={t,w:0,l:0,tie:0,pf:0,pa:0});
-  for (let w=1; w<=S.settings.regWeeks; w++){
-    if (!weekDone(w)) continue;
-    for (const [a,b] of matchups(w)){
-      const A=teamWeek(a,w).total, B=teamWeek(b,w).total;
-      st[a].pf+=A; st[a].pa+=B; st[b].pf+=B; st[b].pa+=A;
-      if (A>B){st[a].w++;st[b].l++;} else if (B>A){st[b].w++;st[a].l++;} else {st[a].tie++;st[b].tie++;}
+  return memo('standings', ()=>{
+    const st = {}; teamIds().forEach(t=>st[t]={t,w:0,l:0,tie:0,pf:0,pa:0});
+    for (let w=1; w<=S.settings.regWeeks; w++){
+      if (!weekDone(w)) continue;
+      for (const [a,b] of regMatchups(w)){
+        const A=teamWeek(a,w).total, B=teamWeek(b,w).total;
+        st[a].pf+=A; st[a].pa+=B; st[b].pf+=B; st[b].pa+=A;
+        if (A>B){st[a].w++;st[b].l++;} else if (B>A){st[b].w++;st[a].l++;} else {st[a].tie++;st[b].tie++;}
+      }
     }
-  }
-  return Object.values(st).sort((x,y)=>(y.w+y.tie/2)-(x.w+x.tie/2)||y.pf-x.pf);
+    return Object.values(st).sort((x,y)=>(y.w+y.tie/2)-(x.w+x.tie/2)||y.pf-x.pf);   // tiebreak: total points for
+  });
+}
+const rangeTotal = (t,weeks) => weeks.reduce((a,w)=>a+teamWeek(t,w).total,0);
+/* bracket: seeds from final regular-season standings; multi-week rounds add up every week of the round; ties go to the higher seed */
+function bracket(){
+  return memo('bracket', ()=>{
+    const rounds = playoffRounds(); if (!rounds.length || !weekDone(S.settings.regWeeks)) return null;
+    const seeds = standings().map(r=>r.t), n = S.settings.playoffTeams, seedOf = t => seeds.indexOf(t)+1;
+    let alive = seeds.slice(0,n); const cons = S.settings.consolation ? seeds.slice(n) : [];
+    const out = [];
+    for (const rd of rounds){
+      let games = [], byes = [];
+      if (n===6 && rd.r===1){ byes = alive.slice(0,2); const rest = alive.slice(2); games = [[rest[0],rest[3]],[rest[1],rest[2]]]; }
+      else { const a = alive.slice().sort((x,y)=>seedOf(x)-seedOf(y)); for (let i=0;i<a.length/2;i++) games.push([a[i],a[a.length-1-i]]); }
+      const done = rd.weeks.every(weekDone), winners = [...byes];
+      const res = games.map(([a,b])=>{ const A=rangeTotal(a,rd.weeks), B=rangeTotal(b,rd.weeks); const win = A>B||(A===B&&seedOf(a)<seedOf(b)) ? a : b; if(done) winners.push(win); return {a,b,A,B,win:done?win:null}; });
+      const cg = []; const c = cons.slice().sort((x,y)=>seedOf(x)-seedOf(y)); for (let i=0;i<Math.floor(c.length/2);i++) cg.push([c[i],c[c.length-1-i]]);
+      out.push({...rd, games:res, byes, cons:cg.map(([a,b])=>({a,b,A:rangeTotal(a,rd.weeks),B:rangeTotal(b,rd.weeks)})), done});
+      if (!done) break;
+      alive = winners.sort((x,y)=>seedOf(x)-seedOf(y)); if (rd.final) break;
+    }
+    const last = out[out.length-1], champ = last && last.final && last.done ? last.games[0].win : null;
+    return {rounds:out, seeds, champ};
+  });
+}
+/* matchups shown for week w (regular season round robin, or playoff + consolation games) */
+function matchups(w){
+  if (w<=S.settings.regWeeks) return regMatchups(w);
+  const b = bracket(); if (!b) return [];
+  const rd = b.rounds.find(r=>r.weeks.includes(w)); if (!rd) return [];
+  const lbl = (rd.final?'🏆 Championship':'Playoffs Round '+rd.r) + (rd.weeks.length>1?` (week ${rd.weeks.indexOf(w)+1} of ${rd.weeks.length})`:'');
+  return rd.games.map(g=>Object.assign([g.a,g.b],{label:lbl, total:[g.A,g.B]})).concat(rd.cons.map(g=>Object.assign([g.a,g.b],{label:'Consolation', total:[g.A,g.B]})));
 }
 
 /* ---------- draft ---------- */
@@ -529,13 +617,33 @@ function draftUpdates(pid, u, n){
   u['rosters/'+team+'/'+pid] = {...snap(p), rnd: Math.floor(n/S.draft.order.length)+1};
   return team;
 }
-function makePick(pid){
+async function makePick(pid, auto){
   const d = draftInfo(); if (!d.team || ownerOf(pid)) return;
   const u = {}; const team = draftUpdates(pid,u,d.n);
+  if (STORE_MODE==='firebase'){   // two people can't take the same pick
+    const r = await fbRef.child('draft/picks/'+d.n).transaction(cur => cur ? undefined : u['draft/picks/'+d.n]);
+    if (!r.committed) return; delete u['draft/picks/'+d.n];
+  }
+  u['draft/clock'] = Date.now();
   if (nextPick(new Set([d.n])) < 0) u['draft/status'] = 'done';
-  logUpdate(u, `${tName(team)} drafted ${pInfo(pid).name} (R${d.rnd} P${d.pickInRnd})`);
+  logUpdate(u, `${tName(team)} drafted ${pInfo(pid).name} (R${d.rnd} P${d.pickInRnd})${auto?' — auto-pick, clock ran out':''}`);
   Store.update(u);
 }
+function startDraft(){ const u = {'draft/status':'live','draft/clock':Date.now()}; if (S.draft.snake===undefined) u['draft/snake'] = S.settings.draftType!=='linear'; Store.update(logUpdate(u,'Draft started')); }
+function moveOrder(i,dir){ const o = S.draft.order.slice(), j = i+dir; if (j<0||j>=o.length) return; [o[i],o[j]] = [o[j],o[i]]; Store.update({'draft/order':o}); }
+function pickClockLeft(){ const sec = S.settings.pickSeconds||0; if (!sec || S.draft.status!=='live' || S.draft.paused) return null; return Math.max(0, sec - (Date.now()-(S.draft.clock||Date.now()))/1000); }
+setInterval(async ()=>{
+  try{
+    if (!S || S.draft.status!=='live') return;
+    const left = pickClockLeft(), el = $('#pickClock'); if (left===null) { if (el) el.textContent=''; return; }
+    if (el) el.textContent = `⏱ ${Math.ceil(left)}s`;
+    if (left<=0 && ui.tab==='draft'){
+      const d = draftInfo(); if (!d.team) return;
+      if (!(await Store.lock('pick'+d.n, 8000))) return;
+      const best = bestAvailable(); if (best) makePick(best.id, true);
+    }
+  }catch(e){}
+}, 1000);
 function simRestOfDraft(){
   checkpoint('Before commissioner auto-draft');
   const u = {}, filled = new Set();
@@ -574,7 +682,7 @@ async function startNextSeason(){
   const s = S.settings, type = s.leagueType, nx = nextSeasonLabel(s.season), start = ($('#nxStart').value||'').replace(/-/g,'') || s.seasonStart;
   closeModal(); await checkpoint('End of '+s.season+' season', true);
   const st = standings(), u = {};
-  u['history/'+s.season.replace(/[^0-9-]/g,'')] = {season:s.season, ts:Date.now(), champion: st[0]?tName(st[0].t):'', standings: st.map(r=>({team:tName(r.t), w:r.w, l:r.l, tie:r.tie, pf:Math.round(r.pf)}))};
+  u['history/'+s.season.replace(/[^0-9-]/g,'')] = {season:s.season, ts:Date.now(), champion: (bracket()&&bracket().champ) ? tName(bracket().champ) : (st[0]?tName(st[0].t):''), standings: st.map(r=>({team:tName(r.t), w:r.w, l:r.l, tie:r.tie, pf:Math.round(r.pf)}))};
   const worstFirst = st.map(r=>r.t).reverse();
   const order = type==='redraft' ? S.draft.order : worstFirst, N = order.length;
   let rosters = {}, picks = {}, rounds = s.rosterSize, snake = true;
@@ -600,27 +708,119 @@ async function startNextSeason(){
   Store.update(u); ui.week = null; go('draft');
 }
 
-/* ---------- transactions ---------- */
+/* ---------- transactions: adds, drops, waivers, IR, trades ---------- */
+const DAY_MS = 864e5;
+function addsUsed(t){ return ((S.adds[t]||{})['w'+curWeek()])||0; }
+function addsLeft(t){ const lim = S.settings.addsPerWeek||0; return lim ? Math.max(0, lim-addsUsed(t)) : Infinity; }
+function onWaivers(pid){ if (S.settings.acqSystem!=='waivers') return false; const w = S.waivers[pid]; return !!(w && w.until > Date.now()); }
+function waiverText(pid){ const w = S.waivers[pid]; return w ? 'Waivers until '+new Date(w.until).toLocaleString([], {weekday:'short', hour:'numeric', minute:'2-digit'}) : ''; }
+function putOnWaivers(u,pid){ if (S.settings.acqSystem==='waivers' && S.settings.waiverDays>0) u['waivers/'+pid] = {until: Date.now()+S.settings.waiverDays*DAY_MS}; }
+function countAdd(u,t){ const k='adds/'+t+'/w'+curWeek(); u[k] = (u[k]!==undefined?u[k]:addsUsed(t)) + 1; }
 function addPlayer(t, pid, dropPid){
-  const u = freezeLineups(t,{}); const p = POOL[pid];
+  const p = POOL[pid] || pInfo(pid);
+  if (ownerOf(pid)) return toast(p.name+' is already on a roster.');
+  if (!isCommish() && addsLeft(t)<=0) return toast(`You've used all ${S.settings.addsPerWeek} adds for this matchup.`);
+  if (activeCount(t) - (dropPid?1:0) >= S.settings.rosterSize) return toast('Your roster is full — pick someone to drop.');
+  if (onWaivers(pid)){
+    const id = uid();
+    Store.update(logUpdate({['claims/'+id]:{team:t, pid, drop:dropPid||null, ts:Date.now(), status:'pending'}}, `${tName(t)} put in a waiver claim`));
+    return toast(`Waiver claim placed for ${p.name}. It's decided when his waiver period ends (${waiverText(pid).replace('Waivers until ','')}) — best waiver priority wins.`);
+  }
+  const u = freezeLineups(t,{});
   u['rosters/'+t+'/'+pid] = snap(p);
-  if (dropPid) u['rosters/'+t+'/'+dropPid] = null;
+  if (dropPid){ u['rosters/'+t+'/'+dropPid] = null; putOnWaivers(u,dropPid); }
+  countAdd(u,t);
   logUpdate(u, `${tName(t)} added ${p.name}` + (dropPid?`, dropped ${pInfo(dropPid).name}`:''));
   Store.update(u);
 }
-function dropPlayer(t,pid){ Store.update(logUpdate(freezeLineups(t,{['rosters/'+t+'/'+pid]:null}), `${tName(t)} dropped ${pInfo(pid).name}`)); }
-function acceptTrade(id){
-  checkpoint('Before trade');
-  const tr = S.trades[id]; if (!tr) return;
+function dropPlayer(t,pid){ const u = freezeLineups(t,{['rosters/'+t+'/'+pid]:null}); putOnWaivers(u,pid); Store.update(logUpdate(u, `${tName(t)} dropped ${pInfo(pid).name}`)); }
+function cancelClaim(id){ Store.update({['claims/'+id+'/status']:'cancelled'}); }
+/* IR: injured players move off the active roster, freeing a spot */
+function canIR(pid){ return isSim() || isCommish() || /out|injur/i.test(pInfo(pid).inj||''); }
+function moveToIR(t,pid){
+  if (irIds(t).length >= S.settings.irSlots) return toast(`IR is full (${S.settings.irSlots} spots).`);
+  if (!canIR(pid)) return toast('Only players listed as OUT can go on IR.');
+  Store.update(logUpdate(freezeLineups(t,{['rosters/'+t+'/'+pid+'/ir']:true}), `${tName(t)} moved ${pInfo(pid).name} to IR`));
+}
+function activateIR(t,pid){
+  if (activeCount(t) >= S.settings.rosterSize) return toast('No open roster spot — drop someone first.');
+  Store.update(logUpdate(freezeLineups(t,{['rosters/'+t+'/'+pid+'/ir']:null}), `${tName(t)} activated ${pInfo(pid).name} from IR`));
+}
+/* waivers: when a player's waiver period ends, the claim from the team with the best waiver priority wins;
+   that team moves to the back of the line (never resets) */
+function processWaivers(u, force){
+  const now = Date.now(); let order = (S.waiverOrder||[]).slice(); const extra = {};
+  if (!order.length) order = S.draft.order.slice().reverse();
+  for (const [pid,w] of Object.entries(S.waivers)){
+    if (!force && w.until > now) continue;
+    const cl = Object.entries(S.claims).filter(([id,c])=>c.pid===pid && c.status==='pending').sort((a,b)=>order.indexOf(a[1].team)-order.indexOf(b[1].team) || a[1].ts-b[1].ts);
+    let won = null;
+    for (const [id,c] of cl){
+      const dropOk = !c.drop || (ownerOf(c.drop)===c.team && u['rosters/'+c.team+'/'+c.drop]!==null);
+      const size = activeCount(c.team) + (extra[c.team]||0) - (c.drop?1:0);
+      if (!won && !ownerOf(pid) && dropOk && size < S.settings.rosterSize && (addsLeft(c.team)>0)){
+        won = c; freezeLineups(c.team,u);
+        u['claims/'+id+'/status'] = 'won'; u['rosters/'+c.team+'/'+pid] = snap(POOL[pid]||pInfo(pid));
+        if (c.drop){ u['rosters/'+c.team+'/'+c.drop] = null; putOnWaivers(u,c.drop); } else extra[c.team] = (extra[c.team]||0)+1;
+        countAdd(u,c.team); order = order.filter(x=>x!==c.team).concat(c.team);
+        logUpdate(u, `WAIVERS: ${tName(c.team)} claimed ${pInfo(pid).name}`+(c.drop?`, dropped ${pInfo(c.drop).name}`:''));
+      } else u['claims/'+id+'/status'] = 'lost';
+    }
+    u['waivers/'+pid] = null;
+  }
+  if (JSON.stringify(order)!==JSON.stringify(S.waiverOrder||[])) u['waiverOrder'] = order;
+}
+function tradeProblem(tr){
   const give = Object.keys(tr.give||{}), get = Object.keys(tr.get||{});
-  if (give.some(p=>ownerOf(p)!==tr.from) || get.some(p=>ownerOf(p)!==tr.to)) { Store.update({['trades/'+id+'/status']:'failed'}); return toast('Trade failed — players no longer on those rosters.'); }
-  const size = S.settings.rosterSize;
-  if (Object.keys(S.rosters[tr.from]).length - give.length + get.length > size || Object.keys(S.rosters[tr.to]).length - get.length + give.length > size) return toast('A roster would go over '+size+' players. Drop someone first.');
-  const u = freezeLineups(tr.to, freezeLineups(tr.from, {['trades/'+id+'/status']:'accepted'}));
+  if (give.some(p=>ownerOf(p)!==tr.from) || get.some(p=>ownerOf(p)!==tr.to)) return 'players are no longer on those rosters';
+  const act = (t,list) => list.filter(p=>!S.rosters[t][p].ir).length, size = S.settings.rosterSize;
+  if (activeCount(tr.from) - act(tr.from,give) + act(tr.to,get) > size || activeCount(tr.to) - act(tr.to,get) + act(tr.from,give) > size) return `a roster would go over ${size} players`;
+  return '';
+}
+function executeTrade(id,u){
+  const tr = S.trades[id], give = Object.keys(tr.give||{}), get = Object.keys(tr.get||{});
+  const why = tradeProblem(tr); if (why){ u['trades/'+id+'/status'] = 'failed'; logUpdate(u, 'Trade failed: '+why); return false; }
+  freezeLineups(tr.to, freezeLineups(tr.from, u));
+  u['trades/'+id+'/status'] = 'accepted'; u['trades/'+id+'/done'] = Date.now();
   give.forEach(p=>{ u['rosters/'+tr.from+'/'+p]=null; u['rosters/'+tr.to+'/'+p]=S.rosters[tr.from][p]; });
   get.forEach(p=>{ u['rosters/'+tr.to+'/'+p]=null; u['rosters/'+tr.from+'/'+p]=S.rosters[tr.to][p]; });
   logUpdate(u, `TRADE: ${tName(tr.from)} sends ${give.map(p=>pInfo(p).name).join(', ')||'nothing'} to ${tName(tr.to)} for ${get.map(p=>pInfo(p).name).join(', ')||'nothing'}`);
-  Store.update(u);
+  return true;
+}
+/* accepting starts the league review period; other teams can vote to veto */
+function acceptTrade(id, now){
+  const tr = S.trades[id]; if (!tr) return;
+  const why = tradeProblem(tr); if (why) return toast('Trade can\'t go through: '+why+'.');
+  const days = S.settings.tradeReviewDays||0;
+  if (days>0 && !now){ Store.update(logUpdate({['trades/'+id+'/status']:'review', ['trades/'+id+'/reviewUntil']:Date.now()+days*DAY_MS}, `${tName(tr.to)} accepted a trade with ${tName(tr.from)} — ${days}-day league review started`)); return; }
+  checkpoint('Before trade');
+  const u = {}; executeTrade(id,u); Store.update(u);
+}
+function voteVeto(id){ Store.update({['trades/'+id+'/votes/'+ME]:true}); }
+function processTrades(u, force){
+  for (const [id,tr] of Object.entries(S.trades)){
+    if (tr.status!=='review' || (!force && tr.reviewUntil > Date.now())) continue;
+    const votes = Object.keys(tr.votes||{}).length;
+    if (votes >= S.settings.vetoVotes){ u['trades/'+id+'/status'] = 'vetoed'; logUpdate(u, `League vetoed the ${tName(tr.from)}–${tName(tr.to)} trade (${votes} votes)`); }
+    else executeTrade(id,u);
+  }
+}
+let lastProc = 0, procBusy = false;
+/* runs waivers + trade reviews whose time is up. Called on page loads and by the Sim Lab clock (force) */
+async function processPending(force){
+  if (!S || S.draft.status!=='done' || procBusy) return; lastProc = Date.now();
+  const dueW = Object.values(S.waivers).some(w=>force || w.until<=Date.now()), dueT = Object.values(S.trades).some(t=>t.status==='review' && (force || t.reviewUntil<=Date.now()));
+  const needOrder = !S.waiverOrder;
+  if (!dueW && !dueT && !needOrder) return;
+  procBusy = true;
+  try{
+    if (!(await Store.lock('pending', 20000))) return;
+    MEMO.clear(); const u = {};
+    if (needOrder) u.waiverOrder = S.draft.order.slice().reverse();
+    if (dueW) processWaivers(u, force);
+    if (dueT) processTrades(u, force);
+    if (Object.keys(u).length) Store.update(u);
+  } finally { procBusy = false; }
 }
 
 /* ---------- UI state ---------- */
@@ -644,9 +844,9 @@ function openModal(html){ $('#modalBody').innerHTML = html; $('#modal').style.di
 function closeModal(){ $('#modal').style.display='none'; }
 $('#modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
 
-const TABS = [['matchup','Scoreboard'],['cast','FantasyCast'],['team','My Team'],['players','Players'],['draft','Draft'],['mock','Mock Draft'],['sim','Sim Lab'],['trades','Trades'],['standings','Standings'],['league','League']];
+const TABS = [['matchup','Scoreboard'],['cast','FantasyCast'],['team','My Team'],['players','Players'],['draft','Draft'],['mock','Mock Draft'],['sim','Sim Lab'],['trades','Trades'],['standings','Standings'],['settings','Settings'],['league','League']];
 function go(t){ ui.tab=t; lsSet('b3h_tab',t); render(); window.scrollTo(0,0); }
-function weekSel(id){ const cw=curWeek(), w=ui.week||cw; let o=''; for(let i=1;i<=S.settings.regWeeks;i++) o+=`<option value="${i}" ${i===w?'selected':''}>${esc(weekLabel(i))}${i===cw?' (current)':''}</option>`; return `<select id="${id}" onchange="ui.week=+this.value;render()">${o}</select>`; }
+function weekSel(id){ const cw=curWeek(), w=ui.week||cw, pr=playoffRounds(); let o=''; for(let i=1;i<=totalWeeks();i++){ const rd=pr.find(r=>r.weeks.includes(i)); o+=`<option value="${i}" ${i===w?'selected':''}>${esc(weekLabel(i))}${rd?(rd.final?' · Final':' · Playoffs'):''}${i===cw?' (current)':''}</option>`; } return `<select id="${id}" onchange="ui.week=+this.value;render()">${o}</select>`; }
 
 /* ---------- render ---------- */
 let lastLiveReq = '';
@@ -662,7 +862,8 @@ function render(){
   $('#tabs').innerHTML = TABS.map(([k,l])=>`<button class="${ui.tab===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('');
   const w = ui.week||curWeek();
   if (!isSim()){ const key=w+'|'+todayStr(); if(key!==lastLiveReq){ lastLiveReq=key; loadLiveWeek(w); } }
-  const v = {matchup:vMatchup, cast:vCast, team:vTeam, players:vPlayers, draft:vDraft, mock:vMock, sim:vSim, trades:vTrades, standings:vStandings, league:vLeague}[ui.tab] || vMatchup;
+  if (S.draft.status==='done' && Date.now()-lastProc > 30000) setTimeout(()=>processPending(false), 0);
+  const v = {settings:vSettings, matchup:vMatchup, cast:vCast, team:vTeam, players:vPlayers, draft:vDraft, mock:vMock, sim:vSim, trades:vTrades, standings:vStandings, league:vLeague}[ui.tab] || vMatchup;
   $('#view').innerHTML = v();
   if (ui.tab==='players' || ui.tab==='draft') renderPlayerList();
   if (ui.tab==='mock') renderMockList();
@@ -676,16 +877,16 @@ function renderSetup(){
     <p>This device has a saved copy of <b>${esc(LOST_COPY.data.settings.name)}</b> from ${new Date(LOST_COPY.ts).toLocaleString()} (${Object.keys(LOST_COPY.data.draft&&LOST_COPY.data.draft.picks||{}).length} draft picks).</p>
     <div class="row"><button class="btn pri" onclick="Store.replace(LOST_COPY.data,'restore from device copy')">Restore it</button><button class="btn" onclick="downloadBackup()">Download it as a file</button><button class="btn" onclick="LOST_COPY=null;render()">Ignore — start a new league</button></div></div>`; return; }
   $('#view').innerHTML = `<div class="card"><h2>Create your league</h2>
-  <p class="muted">Head-to-head points. Every starter's <b>best ${DEFAULT_SETTINGS.gameCap} games</b> each week count — extra games are dropped automatically.</p>
+  <p class="muted">Head-to-head points. Every starter's <b>best ${DEFAULT_SETTINGS.gameCap} games</b> each week count — extra games are dropped automatically. Starts with your ESPN league's settings (8 teams, 15-man rosters + 4 IR, waivers, 19 weeks + 4-team playoffs); everything can be changed later in Settings.</p>
   <div class="row"><label>League name <input id="sName" value="${esc(DEFAULT_SETTINGS.name)}"></label>
   <label>Type <select id="sType">${Object.entries(LEAGUE_TYPES).map(([k,v])=>`<option value="${k}">${v.split(' (')[0]}</option>`).join('')}</select></label>
-  <label>Teams <select id="sTeams">${[4,6,8,10,12,14].map(n=>`<option ${n===10?'selected':''}>${n}</option>`).join('')}</select></label>
+  <label>Teams <select id="sTeams">${[4,6,8,10,12,14].map(n=>`<option ${n===8?'selected':''}>${n}</option>`).join('')}</select></label>
   <button class="btn pri" onclick="createLeague()">Create league</button></div>
   <p class="muted small" style="margin-top:12px">Just want to practice? <button class="btn sm" onclick="go('mock')">Try a mock draft</button></p></div>`;
 }
 function createLeague(){
   const n = +$('#sTeams').value, teams = {};
-  for (let i=0;i<n;i++) teams['t'+i] = {name: 'Team '+(i+1)};
+  for (let i=0;i<n;i++) teams['t'+i] = {name: DEFAULT_TEAM_NAMES[i] || 'Team '+(i+1)};
   const ids = Object.keys(teams);
   Store.replace({settings:{...DEFAULT_SETTINGS, name:$('#sName').value||DEFAULT_SETTINGS.name, numTeams:n, leagueType:$('#sType').value}, teams, rosters:{}, lineups:{}, trades:{}, log:{}, draft:{status:'pre', order:ids, picks:{}}, created:Date.now()});
   go('draft');
@@ -699,9 +900,10 @@ function vMatchup(){
   const noStats = isSim() ? simDaysPlayed(w)===0 : todayStr()<weekDates(w)[0];
   let h = `<div class="row" style="justify-content:space-between"><h2>Scoreboard</h2>${weekSel('wk')}</div>
   <p class="muted small">Each starter's best ${S.settings.gameCap} games count. <span class="chip c">green</span> = counted, <span class="chip x">red</span> = dropped (4th+ game).${noStats?' <b>No games played yet this week.</b>':''}${!isSim()&&liveLoading?' Loading live box scores…':''}</p>`;
-  for (const [a,b] of ms){
-    const A = teamWeek(a,w), B = teamWeek(b,w), key = a+b+w, open = ui.open===key || (ui.open===null && (a===ME||b===ME));
-    h += `<div class="card"><div class="mu" onclick="ui.open=(ui.open==='${key}'?'none':'${key}');render()">
+  if (!ms.length && w>S.settings.regWeeks) h += `<div class="banner">Playoff matchups are set when the regular season ends — see the bracket on the Standings tab.</div>`;
+  for (const m of ms){
+    const [a,b] = m, A = teamWeek(a,w), B = teamWeek(b,w), key = a+b+w, open = ui.open===key || (ui.open===null && (a===ME||b===ME));
+    h += `<div class="card">${m.label?`<div class="small" style="color:var(--acc2);font-weight:800;margin-bottom:6px">${esc(m.label)}${m.total&&playoffRounds().some(r=>r.weeks.length>1&&r.weeks.includes(w))?` · round total ${fmt(m.total[0])} – ${fmt(m.total[1])}`:''}</div>`:''}<div class="mu" onclick="ui.open=(ui.open==='${key}'?'none':'${key}');render()">
       <div><b>${esc(tName(a))}</b></div><div class="s"><span class="${A.total>B.total?'win':''}">${fmt(A.total)}</span> <span class="muted">–</span> <span class="${B.total>A.total?'win':''}">${fmt(B.total)}</span></div><div class="r"><b>${esc(tName(b))}</b></div></div>
       ${open?`<div class="grid2" style="margin-top:12px">${detail(A)}${detail(B)}</div>`:''}</div>`;
   }
@@ -720,14 +922,15 @@ function vTeam(){
   const t = ui.teamView && S.teams[ui.teamView] ? ui.teamView : ME;
   const w = ui.week||curWeek(), ds = weekDates(w), cap = S.settings.gameCap;
   let d = ui.day && ds.includes(ui.day) ? ui.day : (ds.find(x=>!dayLocked(x)) || ds[ds.length-1]);
-  const locked = dayLocked(d), edit = canEdit(t) && (!locked || isCommish());
+  const locked = !dayOpen(d), edit = canEdit(t) && (!locked || isCommish());
+  const slotLocked = pid => pid && playerLocked(pid,d) && !isCommish();
   const T = teamWeek(t,w), lu = lineupForDay(t,d), ros = rosterIds(t), bench = ros.filter(p=>!lu.includes(p));
   const rowOf = pid => T.rows.find(r=>r.pid===pid);
   const usedBefore = pid => ds.filter(e=>e<d).filter(e=>lineupForDay(t,e).includes(pid) && plays(pid,e)).length;
   let h = `<div class="row" style="justify-content:space-between"><h2>${esc(tName(t))}</h2><div class="row">
     <select onchange="ui.teamView=this.value;render()">${teamIds().map(x=>`<option value="${x}" ${x===t?'selected':''}>${esc(tName(x))}</option>`).join('')}</select>${weekSel('wk2')}</div></div>
     <div class="row" style="margin-bottom:8px">${ds.map(x=>`<button class="btn sm ${x===d?'pri':''}" onclick="ui.day='${x}';render()">${dayName(x)} ${+x.slice(4,6)}/${+x.slice(6)}${dayLocked(x)?' 🔒':''}</button>`).join('')}</div>
-    <p class="muted small">Set your lineup <b>each day</b> (changes carry forward to the following days). A player's games only count on days he's in your lineup, and only his best ${cap} started games of the week count — no matter which slot he's in. ${locked?'<b>This day is locked (games started).</b>':''} Roster ${ros.length}/${S.settings.rosterSize}.</p>
+    <p class="muted small">Set your lineup <b>each day</b> (changes carry forward to the following days). A player's games only count on days he's in your lineup, and only his best ${cap} started games of the week count — no matter which slot he's in. ${locked?'<b>This day is locked.</b>':S.settings.lineupLock==='game'&&!isSim()?'Each player locks when his game tips off.':''} Roster ${ros.length}/${S.settings.rosterSize} · IR ${irIds(t).length}/${S.settings.irSlots}${S.settings.addsPerWeek?` · ${addsUsed(t)}/${S.settings.addsPerWeek} adds this matchup`:''}.</p>
     ${ros.length>S.settings.rosterSize?`<div class="banner">Roster is over the ${S.settings.rosterSize}-player limit — drop ${ros.length-S.settings.rosterSize} before adding anyone.</div>`:''}
     ${S.settings.leagueType==='keeper'&&canEdit(t)?`<div class="card"><h3 style="margin-top:0">Keepers for next season (${Object.keys(S.keepers[t]||{}).length}/${S.settings.keepers})</h3><div class="row">${ros.map(x=>{ const on=!!(S.keepers[t]&&S.keepers[t][x]); const kr=keeperRound(t,x); return `<label class="tag" style="cursor:pointer"><input type="checkbox" ${on?'checked':''} onchange="toggleKeeper('${t}','${x}',this.checked)"> ${esc(pInfo(x).name)}${kr?` <span class="muted">· R${kr}</span>`:''}</label>`; }).join('')}</div><p class="muted small" style="margin:6px 0 0">Locked in when the commissioner starts next season.</p></div>`:''}
     ${canEdit(t)?`<div class="card"><div class="row">
@@ -741,19 +944,21 @@ function vTeam(){
   const todayCell = pid => { if(!plays(pid,d)) return '<span class="muted small">no game</span>'; const g=gameOn(pid,d); if(g) return `<span class="chip ${ (rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span>`; const n=usedBefore(pid); return `<b>plays</b>${n>=cap?` <span class="small" style="color:var(--acc2)">(already ${n} games — only counts if it beats his worst)</span>`:''}`; };
   S.settings.slots.forEach((slot,i)=>{
     const pid = lu[i], p = pid?pInfo(pid):null, r = pid&&rowOf(pid);
-    const cell = edit ? `<select onchange="setSlot('${t}','${d}',${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos)).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ●':''}</option>`).join('')}</select>`
-      : (p?`${esc(p.name)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>`:'<span class="muted">Empty</span>');
+    const cell = edit && !slotLocked(pid) ? `<select onchange="setSlot('${t}','${d}',${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos) && (x===pid || !slotLocked(x))).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ●':''}</option>`).join('')}</select>`
+      : (p?`${slotLocked(pid)?'🔒 ':''}${esc(p.name)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>`:'<span class="muted">Empty</span>');
     h += `<tr><td><span class="pos">${slot}</span></td><td>${cell}</td><td>${p?todayCell(pid):''}</td>
       <td>${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" title="${dayName(g.date)}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num"><b>${r?fmt(r.pts):''}</b></td></tr>`;
   });
   const benchPts = T.rows.filter(r=>!lu.includes(r.pid));
   h += `<tr><td></td><td><b>Week total</b></td><td></td><td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>
     ${benchPts.length?`<p class="muted small">Also counting this week (started on other days): ${benchPts.map(r=>`${esc(pInfo(r.pid).name)} ${fmt(r.pts)}`).join(' · ')}</p>`:''}
-    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th><th>Today</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${esc(i.name)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td><td>${plays(p,d)?'<b>plays</b> <span class="muted small">(won\'t count on bench)</span>':'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>`;
+    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th><th>Today</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${esc(i.name)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td><td>${plays(p,d)?'<b>plays</b> <span class="muted small">(won\'t count on bench)</span>':'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
+    ${S.settings.irSlots?`<h3>Injured reserve (${irIds(t).length}/${S.settings.irSlots})</h3><div class="card tw"><table>${irIds(t).map(p=>{const i=pInfo(p);return `<tr><td>${esc(i.name)} <span class="muted small">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span></td><td class="num">${canEdit(t)?`<button class="btn sm" onclick="activateIR('${t}','${p}')">Activate</button> <button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted small">Empty. Players listed as OUT can be moved here from the bench to free a roster spot (games on IR never count).</td></tr>'}</table></div>`:''}`;
   return h;
 }
 function setSlot(t,d,i,pid){
   const lu = lineupForDay(t,d).slice(), j = pid ? lu.indexOf(pid) : -1;
+  if (!isCommish() && ((lu[i] && playerLocked(lu[i],d)) || (pid && playerLocked(pid,d)))) return toast("That player's game already started — he's locked for today.");
   if (j>=0 && j!==i){ if (lu[i] && !eligible(S.settings.slots[j], pInfo(lu[i]).pos)) lu[j]=null; else lu[j]=lu[i]; }
   lu[i] = pid||null;
   Store.update({['lineups/'+t+'/d'+d]: luObj(lu)});
@@ -762,7 +967,12 @@ function confirmDrop(t,pid){ openModal(`<h3>Drop ${esc(pInfo(pid).name)}?</h3><p
 
 /* Players + draft list */
 function vPlayers(){
-  return `<h2>Players</h2>${filterBar()}<div id="plist" class="card tw"></div>`;
+  const s = S.settings, mine = Object.entries(S.claims).filter(([id,c])=>c.team===ME&&c.status==='pending'), order = S.waiverOrder||S.draft.order.slice().reverse();
+  return `<h2>Players</h2>
+  <p class="muted small">${s.acqSystem==='waivers'?`<b>Waivers:</b> dropped players sit on waivers for ${s.waiverDays} day${s.waiverDays===1?'':'s'} (marked <b style="color:var(--acc2)">W</b>) — put in a claim and the team with the best waiver priority gets him; that team then moves to the back of the line. Everyone else is a free agent you can add right away.`:'Free agency: first come, first served.'}
+  ${s.addsPerWeek?` You've used <b>${addsUsed(ME)}/${s.addsPerWeek}</b> adds this matchup.`:''} Your waiver priority: <b>#${order.indexOf(ME)+1}</b> of ${order.length}.</p>
+  ${mine.length?`<div class="card"><h3 style="margin-top:0">Your pending claims</h3>${mine.map(([id,c])=>`<div class="row" style="justify-content:space-between;margin:3px 0"><span>${esc(pInfo(c.pid).name)}${c.drop?` <span class="muted small">(drop ${esc(pInfo(c.drop).name)})</span>`:''} <span class="muted small">· ${esc(waiverText(c.pid))}</span></span><button class="btn sm" onclick="cancelClaim('${id}')">Cancel</button></div>`).join('')}</div>`:''}
+  ${filterBar()}<div id="plist" class="card tw"></div>`;
 }
 function filterBar(){
   return `<div class="row" style="margin-bottom:10px"><input id="pq" placeholder="Search players" value="${esc(ui.q)}" oninput="ui.q=this.value;renderPlayerList()">
@@ -782,14 +992,14 @@ function renderPlayerList(){
   if (draft || ui.avail) list = list.filter(p=>!ownerOf(p.id));
   list.sort((a,b)=>a.rank-b.rank); list = list.slice(0,100);
   const d = draftInfo(), myPick = d.team && (d.team===ME || isCommish()) && S.draft.status==='live';
-  const done = S.draft.status==='done', full = Object.keys(S.rosters[ME]||{}).length >= S.settings.rosterSize;
+  const done = S.draft.status==='done', full = activeCount(ME) >= S.settings.rosterSize, myClaims = new Set(Object.values(S.claims).filter(c=>c.team===ME&&c.status==='pending').map(c=>c.pid));
   el.innerHTML = `<table><tr><th>Rk</th><th>Player</th><th>Pos</th><th>NBA</th>${draft?'':'<th>Owner</th><th class="num">Avg FP</th>'}<th></th></tr>${list.map(p=>{
     const own = ownerOf(p.id), a = draft? null : avgFp(p.id);
     let btn = '';
     if (draft) btn = `<button class="btn sm pri" ${myPick?'':'disabled'} onclick="makePick('${p.id}')">Draft</button>`;
-    else if (!own && done) btn = `<button class="btn sm pri" onclick="${full?`pickDrop('${p.id}')`:`addPlayer(ME,'${p.id}')`}">Add</button>`;
+    else if (!own && done) btn = myClaims.has(p.id) ? '<span class="tag">Claimed</span>' : `<button class="btn sm pri" onclick="${full?`pickDrop('${p.id}')`:`addPlayer(ME,'${p.id}')`}">${onWaivers(p.id)?'Claim':'Add'}</button>`;
     return `<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${esc(p.name)}${p.inj?` <span class="muted small">${esc(p.inj)}</span>`:''}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td>
-    ${draft?'':`<td>${own?esc(tName(own)):'<span class="muted">FA</span>'}</td><td class="num">${a===null?'—':fmt(a)}</td>`}<td class="num">${btn}</td></tr>`;}).join('')}</table>`;
+    ${draft?'':`<td>${own?esc(tName(own)):onWaivers(p.id)?`<span class="small" style="color:var(--acc2)" title="${esc(waiverText(p.id))}">W</span>`:'<span class="muted">FA</span>'}</td><td class="num">${a===null?'—':fmt(a)}</td>`}<td class="num">${btn}</td></tr>`;}).join('')}</table>`;
 }
 function pickDrop(pid){
   openModal(`<h3>Add ${esc(POOL[pid].name)}</h3><p class="muted">Your roster is full — pick someone to drop.</p>${rosterIds(ME).map(x=>`<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(pInfo(x).name)} <span class="muted small">${esc(pInfo(x).pos)}</span></span><button class="btn sm danger" onclick="closeModal();addPlayer(ME,'${pid}','${x}')">Drop</button></div>`).join('')}<div class="row" style="margin-top:10px"><button class="btn" onclick="closeModal()">Cancel</button></div>`);
@@ -802,12 +1012,13 @@ function vDraft(){
   if (st==='pre'){
     const kept = Object.values(S.draft.picks).filter(p=>p.keeper).length;
     h += `<div class="card"><p>${S.settings.season} · ${dSnake()?'Snake':'Straight (same order every round)'} draft · ${dRounds()} rounds · ${d.N} teams${S.settings.leagueType==='dynasty'?' · rookie/free-agent draft':''}${kept?` · ${kept} keepers already placed on the board`:''}.</p>
-      <h3>Draft order</h3><ol>${S.draft.order.map(t=>`<li>${esc(tName(t))}</li>`).join('')}</ol>
+      <h3>Draft order</h3><table>${S.draft.order.map((t,i)=>`<tr><td>${i+1}.</td><td><b>${esc(tName(t))}</b></td><td class="num">${cm&&!kept?`<button class="btn sm" ${i?'':'disabled'} onclick="moveOrder(${i},-1)">▲</button> <button class="btn sm" ${i<S.draft.order.length-1?'':'disabled'} onclick="moveOrder(${i},1)">▼</button>`:''}</td></tr>`).join('')}</table>
+      <p class="small muted">${S.settings.pickSeconds?`${S.settings.pickSeconds} seconds per pick — when the clock runs out, the best available player is auto-picked.`:'No pick clock.'} Change in Settings.</p>
       ${kept?`<p class="small muted">Keepers are on the board below. Randomizing the order would move them, so it's disabled.</p>`:''}
-      <div class="row">${cm?`<button class="btn" ${kept?'disabled':''} onclick="randomizeOrder()">Randomize order</button><button class="btn pri" onclick="Store.update(logUpdate({'draft/status':'live'},'Draft started'))">Start draft</button>`:'<span class="muted">Waiting for the commissioner to start the draft. (Turn on Commissioner mode in the League tab.)</span>'}</div></div>`;
+      <div class="row">${cm?`<button class="btn" ${kept?'disabled':''} onclick="randomizeOrder()">Randomize order</button><button class="btn pri" onclick="startDraft()">Start draft</button>`:'<span class="muted">Waiting for the commissioner to start the draft. (Turn on Commissioner mode in the League tab.)</span>'}</div></div>`;
     if (!kept) return h;
   }
-  if (st==='live') h += `<div class="banner">On the clock: ${esc(tName(d.team))} — Round ${d.rnd}, pick ${d.pickInRnd}${d.team===ME?' · THAT\'S YOU':''}</div>
+  if (st==='live') h += `<div class="banner row" style="justify-content:space-between"><span>On the clock: ${esc(tName(d.team))} — Round ${d.rnd}, pick ${d.pickInRnd}${d.team===ME?' · THAT\'S YOU':''}</span><span id="pickClock" style="font-size:20px"></span>${cm&&S.settings.pickSeconds?`<button class="btn sm" onclick="Store.update({'draft/paused':${S.draft.paused?'null':'true'},'draft/clock':Date.now()})">${S.draft.paused?'Resume clock':'Pause clock'}</button>`:''}</div>
     <div class="row" style="margin-bottom:10px">${(d.team===ME||cm)?`<button class="btn" onclick="makePick(bestAvailable().id)">Auto-pick best available</button>`:''}${cm?`<button class="btn" onclick="simRestOfDraft()">Commish: auto-draft the rest</button><button class="btn danger" onclick="undoPick()">Undo last pick</button>`:''}</div>`;
   else if (st==='done') h += `<div class="banner">Draft complete. Set your lineup in My Team.</div>${cm?`<div class="row" style="margin-bottom:10px"><button class="btn danger" onclick="undoPick()">Undo last pick</button></div>`:''}`;
   // board
@@ -827,8 +1038,10 @@ function randomizeOrder(){ const o=S.draft.order.slice().sort(()=>Math.random()-
 function vTrades(){
   if (S.draft.status!=='done') return `<h2>Trades</h2><div class="banner">Trades open after the draft.</div>`;
   const other = ui.tradeWith && ui.tradeWith!==ME ? ui.tradeWith : teamIds().find(t=>t!==ME);
-  const list = (t,set,name) => rosterIds(t).map(p=>`<label class="row small" style="margin:3px 0"><input type="checkbox" ${set.has(p)?'checked':''} onchange="ui.${name}[this.checked?'add':'delete']('${p}')"> ${esc(pInfo(p).name)} <span class="muted">${esc(pInfo(p).pos)}</span></label>`).join('');
-  let h = `<h2>Trades</h2><div class="card"><h3>Propose a trade</h3><div class="row" style="margin-bottom:8px">Trade with <select onchange="ui.tradeWith=this.value;ui.tradeGet.clear();render()">${teamIds().filter(t=>t!==ME).map(t=>`<option value="${t}" ${t===other?'selected':''}>${esc(tName(t))}</option>`).join('')}</select></div>
+  const list = (t,set,name) => allRosterIds(t).map(p=>`<label class="row small" style="margin:3px 0"><input type="checkbox" ${set.has(p)?'checked':''} onchange="ui.${name}[this.checked?'add':'delete']('${p}')"> ${esc(pInfo(p).name)} <span class="muted">${esc(pInfo(p).pos)}</span></label>`).join('');
+  const s = S.settings, pastDeadline = s.tradeDeadline && todayStr() > s.tradeDeadline;
+  let h = `<h2>Trades</h2><p class="muted small">${s.tradeReviewDays?`Accepted trades go through a ${s.tradeReviewDays}-day league review. If ${s.vetoVotes} other teams vote to veto, it's cancelled.`:'Accepted trades go through right away.'} ${s.tradeDeadline?`Trade deadline: ${s.tradeDeadline.slice(4,6)}/${s.tradeDeadline.slice(6)}.`:'No trade deadline.'}</p>
+  ${pastDeadline?'<div class="banner">The trade deadline has passed.</div>':''}<div class="card"><h3>Propose a trade</h3><div class="row" style="margin-bottom:8px">Trade with <select onchange="ui.tradeWith=this.value;ui.tradeGet.clear();render()">${teamIds().filter(t=>t!==ME).map(t=>`<option value="${t}" ${t===other?'selected':''}>${esc(tName(t))}</option>`).join('')}</select></div>
     <div class="grid2"><div><b>You send</b>${list(ME,ui.tradeGive,'tradeGive')}</div><div><b>You get</b>${list(other,ui.tradeGet,'tradeGet')}</div></div>
     <div class="row" style="margin-top:10px"><button class="btn pri" onclick="proposeTrade('${other}')">Send offer</button></div></div><h3>Offers</h3>`;
   const trs = Object.entries(S.trades).sort((a,b)=>b[1].ts-a[1].ts);
@@ -840,12 +1053,19 @@ function vTrades(){
       if (tr.to===ME || isCommish()) act += `<button class="btn sm pri" onclick="acceptTrade('${id}')">Accept${tr.to!==ME?' (as '+esc(tName(tr.to))+')':''}</button> <button class="btn sm" onclick="Store.update({'trades/${id}/status':'rejected'})">Reject</button> `;
       if (tr.from===ME) act += `<button class="btn sm" onclick="Store.update({'trades/${id}/status':'cancelled'})">Cancel</button> `;
     }
-    if (tr.status==='accepted' && isCommish()) act += `<button class="btn sm danger" onclick="vetoTrade('${id}')">Commish veto</button>`;
+    if (tr.status==='review'){
+      const votes = Object.keys(tr.votes||{}), left = Math.max(0, tr.reviewUntil-Date.now());
+      act += `<span class="small muted">Goes through in ${Math.floor(left/3600e3)}h ${Math.floor(left%3600e3/60e3)}m · veto votes ${votes.length}/${S.settings.vetoVotes}</span> `;
+      if (ME!==tr.from && ME!==tr.to && !votes.includes(ME)) act += `<button class="btn sm danger" onclick="voteVeto('${id}')">Vote to veto</button> `;
+      if (isCommish()) act += `<button class="btn sm pri" onclick="checkpoint('Before trade');const u={};executeTrade('${id}',u);Store.update(u)">Commish: approve now</button> <button class="btn sm danger" onclick="Store.update(logUpdate({'trades/${id}/status':'vetoed'},'Commissioner vetoed a trade'))">Commish: veto</button>`;
+    }
+    if (tr.status==='accepted' && isCommish()) act += `<button class="btn sm danger" onclick="vetoTrade('${id}')">Commish: reverse trade</button>`;
     h += `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(tName(tr.from))}</b> sends ${names(tr.give)} → <b>${esc(tName(tr.to))}</b> sends ${names(tr.get)}</div><span class="tag">${tr.status.toUpperCase()}</span></div><div class="row" style="margin-top:6px">${act}</div></div>`;
   }
   return h;
 }
 function proposeTrade(to){
+  if (S.settings.tradeDeadline && todayStr() > S.settings.tradeDeadline && !isCommish()) return toast('The trade deadline has passed.');
   if (!ui.tradeGive.size && !ui.tradeGet.size) return toast('Pick at least one player.');
   const id = uid(), o = s => Object.fromEntries([...s].map(p=>[p,true]));
   Store.update(logUpdate({['trades/'+id]:{from:ME,to,give:o(ui.tradeGive),get:o(ui.tradeGet),status:'pending',ts:Date.now()}}, `${tName(ME)} sent a trade offer to ${tName(to)}`));
@@ -861,9 +1081,87 @@ function vetoTrade(id){
 /* Standings */
 function vStandings(){
   if (S.draft.status!=='done') return `<h2>Standings</h2><div class="banner">Standings start after the draft.</div>`;
-  const st = standings();
-  return `<h2>Standings</h2><div class="card tw"><table><tr><th>#</th><th>Team</th><th>W-L-T</th><th class="num">PF</th><th class="num">PA</th></tr>${st.map((r,i)=>`<tr${r.t===ME?' style="background:rgba(255,122,26,.08)"':''}><td>${i+1}</td><td><b>${esc(tName(r.t))}</b></td><td>${r.w}-${r.l}-${r.tie}</td><td class="num">${fmt(r.pf)}</td><td class="num">${fmt(r.pa)}</td></tr>`).join('')}</table></div>
-  <p class="muted small">Counts completed weeks only. Top 6 make the playoffs (playoff bracket coming in a later version).</p>`;
+  const st = standings(), n = S.settings.playoffTeams, b = bracket();
+  let h = `<h2>Standings</h2><div class="card tw"><table><tr><th>#</th><th>Team</th><th>W-L-T</th><th class="num">PF</th><th class="num">PA</th></tr>${st.map((r,i)=>`<tr${r.t===ME?' style="background:rgba(255,122,26,.08)"':''}><td>${i+1}</td><td><b>${esc(tName(r.t))}</b></td><td>${r.w}-${r.l}-${r.tie}</td><td class="num">${fmt(r.pf)}</td><td class="num">${fmt(r.pa)}</td></tr>${i===n-1&&n<st.length?'<tr><td colspan="5" class="small" style="color:var(--acc2);border-bottom:2px dashed var(--acc2)">▲ playoff line</td></tr>':''}`).join('')}</table></div>
+  <p class="muted small">${S.settings.regWeeks}-week regular season, then a ${n}-team playoff (${S.settings.playoffRoundWeeks}-week rounds, ${S.settings.champRoundWeeks}-week final). Ties in the standings go to total points for; tied playoff matchups go to the higher seed.</p><h3>Playoff bracket</h3>`;
+  if (!b) return h + `<div class="card muted">Bracket is set when the regular season ends (${weekLabel(S.settings.regWeeks).split(' · ')[1]}).</div>`;
+  const seed = t => b.seeds.indexOf(t)+1;
+  h += b.champ ? `<div class="banner">🏆 ${esc(tName(b.champ))} — league champion!</div>` : '';
+  h += `<div class="grid2">` + b.rounds.map(rd=>`<div class="card"><h3 style="margin-top:0">${rd.final?'Championship':'Round '+rd.r} <span class="muted small">· weeks ${rd.weeks.join(' & ')}</span></h3>
+    ${rd.byes.map(t=>`<div class="small muted">(${seed(t)}) ${esc(tName(t))} — bye</div>`).join('')}
+    ${rd.games.map(g=>`<div class="mu" style="cursor:default;margin:6px 0"><div class="${g.win===g.a?'win':''}">(${seed(g.a)}) <b>${esc(tName(g.a))}</b></div><div><b>${fmt(g.A)}</b> – <b>${fmt(g.B)}</b></div><div class="r ${g.win===g.b?'win':''}"><b>${esc(tName(g.b))}</b> (${seed(g.b)})</div></div>`).join('')}
+    ${rd.cons.length?`<div class="small muted" style="margin-top:8px">Consolation: ${rd.cons.map(g=>`${esc(tName(g.a))} ${fmt(g.A)}–${fmt(g.B)} ${esc(tName(g.b))}`).join(' · ')}</div>`:''}</div>`).join('') + `</div>`;
+  return h;
+}
+
+/* Settings — mirrors ESPN's settings page; only the commissioner can change things */
+function setS(k,v){ Store.update({['settings/'+k]:v}); }
+function slotCounts(){ const c = {}; SLOT_TYPES.forEach(x=>c[x]=0); S.settings.slots.forEach(x=>c[x]=(c[x]||0)+1); return c; }
+function setSlotCount(type,n){ const c = slotCounts(); c[type] = n; const slots = []; SLOT_TYPES.forEach(x=>{ for(let i=0;i<c[x];i++) slots.push(x); }); Store.update({'settings/slots':slots}); }
+function setNumTeams(n){
+  if (S.draft.status!=='pre' || Object.keys(S.draft.picks).length) return toast('Team count can only change before the draft.');
+  const u = {}, ids = []; for (let i=0;i<n;i++){ ids.push('t'+i); if (!S.teams['t'+i]) u['teams/t'+i] = {name: DEFAULT_TEAM_NAMES[i]||'Team '+(i+1)}; }
+  Object.keys(S.teams).forEach(t=>{ if (!ids.includes(t)) u['teams/'+t] = null; });
+  u['draft/order'] = S.draft.order.filter(t=>ids.includes(t)).concat(ids.filter(t=>!S.draft.order.includes(t)));
+  u['settings/numTeams'] = n; Store.update(u);
+}
+function vSettings(){
+  const s = S.settings, cm = isCommish(), dis = cm ? '' : 'disabled', c = slotCounts();
+  const sel = (k, opts, num) => `<select ${dis} onchange="setS('${k}',${num?'+this.value':'this.value'})">${opts.map(o=>{ const [v,l] = Array.isArray(o)?o:[o,o]; return `<option value="${v}" ${String(v)===String(s[k])?'selected':''}>${l}</option>`; }).join('')}</select>`;
+  const row = (label, ctl, note) => `<tr><td>${label}${note?`<div class="small muted">${note}</div>`:''}</td><td class="num">${ctl}</td></tr>`;
+  const range = (a,b) => Array.from({length:b-a+1},(_,i)=>a+i);
+  const dateIn = (k) => `<input type="date" ${dis} value="${s[k]?s[k].slice(0,4)+'-'+s[k].slice(4,6)+'-'+s[k].slice(6):''}" onchange="setS('${k}',this.value.replace(/-/g,''))">`;
+  return `<h2>Settings</h2>${cm?'<p class="muted small">You\'re the commissioner — changes save for the whole league immediately.</p>':'<div class="banner" style="font-weight:600">View only. The commissioner can change these (League tab → Commissioner mode).</div>'}
+  <div class="grid2"><div>
+  <div class="card"><h3 style="margin-top:0">Basic</h3><table>
+    ${row('League name', `<input ${dis} value="${esc(s.name)}" onchange="setS('name',this.value)">`)}
+    ${row('Number of teams', `<select ${dis} onchange="setNumTeams(+this.value)">${range(2,16).map(n=>`<option ${n===s.numTeams?'selected':''}>${n}</option>`).join('')}</select>`, 'Before the draft only')}
+    ${row('Scoring type', 'Head to Head Points')}
+    ${row('League type', sel('leagueType', Object.entries(LEAGUE_TYPES).map(([k,v])=>[k,v.split(' (')[0]])))}
+    ${s.leagueType==='keeper'?row('Keepers per team', sel('keepers', range(1,10), true))+row('Keeper cost', sel('keeperCost', [['round','Round he was drafted'],['last','Last-round picks']])):''}
+    ${s.leagueType==='dynasty'?row('Rookie draft rounds', sel('rookieRounds', range(1,6), true)):''}
+  </table></div>
+  <div class="card"><h3 style="margin-top:0">Draft</h3><table>
+    ${row('Draft type', `<select ${dis} onchange="setS('draftType',this.value); if(S.draft.status==='pre') Store.update({'draft/snake':this.value!=='linear'})"><option value="snake" ${s.draftType!=='linear'?'selected':''}>Snake</option><option value="linear" ${s.draftType==='linear'?'selected':''}>Straight (same order every round)</option></select>`)}
+    ${row('Time per pick', sel('pickSeconds', [[0,'No clock'],[30,'30 seconds'],[60,'60 seconds'],[90,'90 seconds'],[120,'2 minutes'],[300,'5 minutes']], true), 'Clock runs out → best available is auto-picked')}
+    ${row('Draft order', 'Set by commissioner (Draft tab)')}
+  </table></div>
+  <div class="card"><h3 style="margin-top:0">Roster</h3><table>
+    ${row('Roster size (starters + bench)', sel('rosterSize', range(s.slots.length, 25), true))}
+    ${row('Starters / bench', `${s.slots.length} / ${s.rosterSize-s.slots.length}`)}
+    ${row('Injured reserve (IR) spots', sel('irSlots', range(0,6), true), 'Extra spots on top of the roster')}
+    ${SLOT_TYPES.map(x=>row(`${x} starters`, `<select ${dis} onchange="setSlotCount('${x}',+this.value)">${range(0,5).map(n=>`<option ${n===c[x]?'selected':''}>${n}</option>`).join('')}</select>`)).join('')}
+  </table><p class="small muted">Tip: change positions before the season — mid-season, saved lineups get rebuilt.</p></div>
+  </div><div>
+  <div class="card"><h3 style="margin-top:0">Games-played limit</h3><table>
+    ${row('Games that count per player, per week', sel('gameCap', [...range(1,7).map(n=>[n,n===3?'3 (best 3)':String(n)]), [99,'No limit']], true), "Each player's best N started games count")}
+  </table></div>
+  <div class="card"><h3 style="margin-top:0">Scoring</h3><table>
+    ${Object.keys(STAT_LABELS).map(k=>row(`${STAT_LABELS[k]} (${k})`, `<input type="number" step="0.5" style="width:80px" ${dis} value="${s.scoring[k]||0}" onchange="Store.update({['settings/scoring/${k}']:+this.value||null})">`)).join('')}
+  </table><p class="small muted">0 = not counted. A triple-double also counts as a double-double (both bonuses).</p></div>
+  <div class="card"><h3 style="margin-top:0">Lineups, waivers & adds</h3><table>
+    ${row('Lineup changes', sel('lineupLock', [['game','Daily — lock individually at game time'],['day','Daily — lock at first game of the day']]))}
+    ${row('Player acquisition', sel('acqSystem', [['waivers','Waivers'],['fa','Free agency (first come)']]))}
+    ${row('Waiver period', sel('waiverDays', [[0,'None'],[1,'1 day'],[2,'2 days'],[3,'3 days']], true))}
+    ${row('Waiver order', 'Move to last after claim, never reset')}
+    ${row('Adds per matchup', sel('addsPerWeek', [[0,'No limit'],...range(1,14).map(n=>[n,String(n)])], true))}
+  </table></div>
+  <div class="card"><h3 style="margin-top:0">Trades</h3><table>
+    ${row('Trade review period', sel('tradeReviewDays', [[0,'None — instant'],[1,'1 day'],[2,'2 days'],[3,'3 days']], true))}
+    ${row('Votes required to veto', sel('vetoVotes', range(1,Math.max(1,s.numTeams-2)), true))}
+    ${row('Trade deadline', dateIn('tradeDeadline') + (s.tradeDeadline&&cm?` <button class="btn sm" onclick="setS('tradeDeadline','')">None</button>`:''), s.tradeDeadline?'':'No deadline')}
+  </table></div>
+  <div class="card"><h3 style="margin-top:0">Season & playoffs</h3><table>
+    ${row('Season', esc(s.season))}
+    ${row('Opening night', dateIn('seasonStart'))}
+    ${row('Regular season matchups (weeks)', sel('regWeeks', range(8,24), true))}
+    ${row('Playoff teams', sel('playoffTeams', [[0,'No playoffs'],2,4,6,8], true))}
+    ${row('Weeks per playoff round', sel('playoffRoundWeeks', [1,2], true))}
+    ${row('Weeks in championship round', sel('champRoundWeeks', [1,2], true))}
+    ${row('Consolation ladder', sel('consolation', [[1,'Yes'],[0,'No']], true))}
+    ${row('Tie breakers', 'Standings: total points for · playoffs: higher seed')}
+  </table></div>
+  </div></div>`;
 }
 
 /* League */
@@ -873,8 +1171,8 @@ function vLeague(){
   return `<h2>League</h2>
   <div class="grid2">
   <div class="card"><h3>Your team</h3><div class="row"><input id="tn" value="${esc(tName(ME))}"><button class="btn" onclick="Store.update({['teams/'+ME+'/name']:$('#tn').value||tName(ME)})">Rename</button></div>
-    <h3>Scoring (H2H points)</h3><table>${Object.keys(STAT_LABELS).map(k=>`<tr><td>${STAT_LABELS[k]}</td><td class="num"><b>${s.scoring[k]>0?'+':''}${s.scoring[k]}</b></td></tr>`).join('')}</table>
-    <p class="muted small">Rule: each starter's best <b>${s.gameCap}</b> games per week count. Triple-doubles earn both bonuses (+${s.scoring.DD+s.scoring.TD}). Lineup: ${s.slots.join(', ')} + ${s.rosterSize-s.slots.length} bench.</p>
+    <h3>Scoring (H2H points)</h3><table>${Object.keys(STAT_LABELS).filter(k=>s.scoring[k]).map(k=>`<tr><td>${STAT_LABELS[k]}</td><td class="num"><b>${s.scoring[k]>0?'+':''}${s.scoring[k]}</b></td></tr>`).join('')}</table>
+    <p class="muted small">Rule: each starter's best <b>${s.gameCap>=99?'(no limit)':s.gameCap}</b> games per week count. Lineup: ${s.slots.join(', ')} + ${s.rosterSize-s.slots.length} bench + ${s.irSlots} IR. <a href="#" onclick="go('settings');return false">All settings →</a></p>
     <h3>League type · ${esc(s.season)}</h3><p><b>${esc(LEAGUE_TYPES[s.leagueType])}</b></p>
     <p class="muted small">${s.leagueType==='keeper'?`Each team keeps up to ${s.keepers} players (pick them on My Team). ${s.keeperCost==='round'?'A keeper costs the pick in the round he was drafted; free-agent pickups cost a last-round pick.':'Keepers cost your last-round picks.'}`:s.leagueType==='dynasty'?`Teams keep everyone. Each new season starts with a ${s.rookieRounds}-round rookie/free-agent draft, worst record picks first.`:'Everyone redrafts from scratch each season.'}</p>
     ${Object.keys(S.history).length?`<h3>League history</h3><table>${Object.values(S.history).sort((a,b)=>b.ts-a.ts).map(h=>`<tr><td>${esc(h.season)}</td><td>🏆 <b>${esc(h.champion)}</b></td><td class="small muted">${(h.standings||[]).slice(0,3).map(x=>`${esc(x.team)} ${x.w}-${x.l}`).join(' · ')}</td></tr>`).join('')}</table>`:''}</div>
@@ -882,12 +1180,7 @@ function vLeague(){
     <label class="row"><input type="checkbox" ${cm?'checked':''} onchange="toggleCommish(this.checked)"> Commissioner mode (this browser)</label>
     ${cm?`<p class="small muted">Stats source</p><div class="row"><select onchange="Store.update({'settings/statsMode':this.value})"><option value="sim" ${isSim()?'selected':''}>Simulated (demo / preseason)</option><option value="live" ${!isSim()?'selected':''}>Live ESPN box scores</option></select></div>
       ${isSim()?`<p class="small muted">Sim clock: <b>${esc(simStatus())}</b> — move it in the <a href="#" onclick="go('sim');return false">Sim Lab</a>.</p>`:''}
-      <h3>League type</h3><div class="row">
-        <select onchange="Store.update({'settings/leagueType':this.value})">${Object.entries(LEAGUE_TYPES).map(([k,v])=>`<option value="${k}" ${k===s.leagueType?'selected':''}>${v.split(' (')[0]}</option>`).join('')}</select>
-        ${s.leagueType==='keeper'?`<label class="small">Keepers <select onchange="Store.update({'settings/keepers':+this.value})">${[1,2,3,4,5,6,8,10].map(n=>`<option ${n===s.keepers?'selected':''}>${n}</option>`).join('')}</select></label>
-          <label class="small">Cost <select onchange="Store.update({'settings/keeperCost':this.value})"><option value="round" ${s.keeperCost==='round'?'selected':''}>Round he was drafted</option><option value="last" ${s.keeperCost!=='round'?'selected':''}>Last-round picks</option></select></label>`:''}
-        ${s.leagueType==='dynasty'?`<label class="small">Rookie draft rounds <select onchange="Store.update({'settings/rookieRounds':+this.value})">${[1,2,3,4,5].map(n=>`<option ${n===s.rookieRounds?'selected':''}>${n}</option>`).join('')}</select></label>`:''}</div>
-      <div class="row" style="margin-top:8px"><button class="btn" onclick="seasonModal()">Start next season (${esc(nextSeasonLabel(s.season))})…</button></div>
+      <h3>Season</h3><p class="small muted">League type and every other rule live on the <a href="#" onclick="go('settings');return false">Settings</a> tab.</p>      <div class="row" style="margin-top:8px"><button class="btn" onclick="seasonModal()">Start next season (${esc(nextSeasonLabel(s.season))})…</button></div>
       <h3>Team names</h3>${teamIds().map(t=>`<div class="row" style="margin:3px 0"><input value="${esc(tName(t))}" onchange="Store.update({['teams/${t}/name']:this.value})"></div>`).join('')}
       <h3>Backups</h3><p class="small muted">${STORE_MODE==='firebase'?'The league saves online after every change. On top of that, a checkpoint is saved every 12 hours and before any big change (restore, delete, auto-draft, trades), and each device keeps its own copy.':'Sandbox mode — saved in this browser only.'}</p>
       <div class="row"><button class="btn" onclick="downloadBackup()">Download backup file</button><label class="btn">Restore from file<input type="file" accept=".json" style="display:none" onchange="restoreFromFile(this)"></label>
@@ -1044,9 +1337,9 @@ function vSim(){
   if (!isSim()) h += `<div class="banner">The league is on LIVE ESPN stats. ${isCommish()?`<button class="btn sm" onclick="Store.update({'settings/statsMode':'sim'})">Switch to simulated stats</button>`:'The commissioner can switch to simulated stats in the League tab.'}</div>`;
   else h += `<div class="card"><h3>Season clock</h3><p>Now: <b>${esc(simStatus())}</b></p>
     <div class="row"><button class="btn pri" ${dis} onclick="simAdvanceDay()">+1 day</button><button class="btn" ${dis} onclick="simFinishWeek()">Finish this week</button>
-    <button class="btn" ${dis} onclick="simSet(${s.regWeeks},0)">Sim whole regular season</button><button class="btn" ${dis} onclick="simSet(0,0)">Back to preseason</button>
+    <button class="btn" ${dis} onclick="simSet(${s.regWeeks},0)">Sim whole regular season</button><button class="btn" ${dis} onclick="simSet(totalWeeks(),0)">Sim through playoffs</button><button class="btn" ${dis} onclick="simSet(0,0)">Back to preseason</button>
     <button class="btn" ${dis} onclick="Store.update({'settings/simSeed':(S.settings.simSeed||1)+1})">Re-roll all stats</button></div>
-    <div class="row" style="margin-top:8px"><span class="small muted">Jump to start of</span><select ${dis} onchange="simSet(+this.value-1,0)">${Array.from({length:s.regWeeks},(_,i)=>`<option value="${i+1}" ${i+1===s.simWeek+1?'selected':''}>${esc(weekLabel(i+1))}</option>`).join('')}</select>
+    <div class="row" style="margin-top:8px"><span class="small muted">Jump to start of</span><select ${dis} onchange="simSet(+this.value-1,0)">${Array.from({length:totalWeeks()},(_,i)=>`<option value="${i+1}" ${i+1===s.simWeek+1?'selected':''}>${esc(weekLabel(i+1))}</option>`).join('')}</select>
     ${canSim()?'':'<span class="small muted">Commissioner only in online mode.</span>'}</div>
     <p class="muted small">Tip: go day by day and watch the Scoreboard — once a player's 4th game happens, his lowest game turns red.</p></div>`;
   if (S.draft.status!=='done') h += `<div class="card"><h3>Quick test league</h3><p class="muted">Your draft isn't done. This auto-drafts every team by ranking and jumps the sim to mid-Week 3 so you can see scores right away.</p><button class="btn pri" ${dis} onclick="quickTest()">Auto-draft everyone & start testing</button></div>`;
