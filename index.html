@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Best of 3 Hoops</title>
+<style>
+:root{--bg:#0d1320;--panel:#151d2e;--panel2:#1c2740;--line:#273451;--text:#e8edf7;--mute:#8e9bb5;--acc:#ff7a1a;--acc2:#ffb066;--good:#3ecf8e;--bad:#ff5d6c;--blue:#4da3ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:linear-gradient(90deg,#1a1208,#151d2e 60%);border-bottom:2px solid var(--acc);flex-wrap:wrap}
+.brand{font-weight:900;font-size:20px;letter-spacing:.5px}
+.brand b{color:var(--acc)}
+.brand small{display:block;font-size:11px;color:var(--mute);font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.spacer{flex:1}
+nav{display:flex;gap:2px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{background:none;border:0;color:var(--mute);padding:12px 14px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;font-size:14px}
+nav button.on{color:var(--text);border-bottom-color:var(--acc)}
+main{max-width:1150px;margin:0 auto;padding:16px}
+h2{margin:4px 0 12px;font-size:20px}
+h3{margin:16px 0 8px;font-size:15px;color:var(--acc2);text-transform:uppercase;letter-spacing:.8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--mute)}
+.small{font-size:12px}
+button.btn,select,input{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 11px}
+button.btn{cursor:pointer;font-weight:700}
+button.btn:hover{border-color:var(--acc)}
+button.pri{background:var(--acc);border-color:var(--acc);color:#1a0e02}
+button.danger{border-color:var(--bad);color:var(--bad)}
+button.sm{padding:3px 9px;font-size:12px}
+button:disabled{opacity:.4;cursor:not-allowed}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+td.num,th.num{text-align:right}
+.pos{display:inline-block;min-width:34px;text-align:center;font-size:11px;font-weight:800;padding:2px 5px;border-radius:5px;background:var(--panel2);color:var(--acc2)}
+.chip{display:inline-block;padding:1px 7px;border-radius:10px;font-size:12px;font-weight:700;margin:1px 2px 1px 0}
+.chip.c{background:rgba(62,207,142,.18);color:var(--good)}
+.chip.x{background:rgba(255,93,108,.12);color:var(--bad);text-decoration:line-through}
+.mu{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;cursor:pointer}
+.mu .s{font-size:24px;font-weight:900}
+.mu .r{text-align:right}
+.win{color:var(--good)}
+.banner{background:linear-gradient(90deg,rgba(255,122,26,.25),transparent);border-left:4px solid var(--acc);padding:10px 14px;border-radius:8px;margin-bottom:12px;font-weight:700}
+.board{display:grid;gap:3px;font-size:11px}
+.board div{background:var(--panel2);border-radius:5px;padding:4px;min-height:38px;overflow:hidden}
+.board .hd{background:none;font-weight:800;color:var(--acc2);min-height:0;text-align:center}
+.board .me{outline:1px solid var(--acc)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}.mu .s{font-size:19px}}
+.tag{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--panel2);color:var(--mute);font-weight:700}
+.tag.live{color:var(--good)}
+.tag.sim{color:var(--acc2)}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+#modal .card{max-width:440px;width:100%;max-height:80vh;overflow:auto}
+.lock{color:var(--mute);font-size:12px}
+a{color:var(--blue)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>BEST OF 3</b> HOOPS<small id="lgname">Fantasy Basketball</small></div>
+  <div class="spacer"></div>
+  <span id="modeTag" class="tag"></span>
+  <label class="small muted">Acting as <select id="meSel"></select></label>
+</header>
+<nav id="tabs"></nav>
+<main id="view"><div class="card">Loading…</div></main>
+<div id="modal"><div class="card" id="modalBody"></div></div>
+
+<script>
+/* =================================================================
+   CONFIG — paste your Firebase web config here to make it multiplayer.
+   Leave null to run in DEMO mode (saves only in this browser).
+   ================================================================= */
+const FIREBASE_CONFIG = null;   // e.g. {apiKey:"...", authDomain:"...", databaseURL:"https://xxx.firebaseio.com", projectId:"..."}
+const LEAGUE_ID = 'league1';
+
+const DEFAULT_SETTINGS = {
+  name: 'Best of 3 League', numTeams: 10, rosterSize: 13,
+  slots: ['PG','SG','SF','PF','C','G','F','UTIL','UTIL','UTIL'],
+  scoring: {PTS:1, FGM:1, REB:1, AST:1, STL:1, BLK:1, TO:-1, DD:5, TD:10},
+  gameCap: 3, regWeeks: 20, statsMode: 'sim', simWeek: 2, simDay: 3, simSeed: 1
+};
+const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const STAT_LABELS = {PTS:'Points',FGM:'Field Goals Made',REB:'Rebounds',AST:'Assists',STL:'Steals',BLK:'Blocks',TO:'Turnovers',DD:'Double-Double',TD:'Triple-Double'};
+const ELIG = {PG:['PG','G'],SG:['SG','G'],SF:['SF','F'],PF:['PF','F'],C:['C'],G:['PG','SG','G'],F:['SF','PF','F'],UTIL:null};
+const NBA = ['ATL','BOS','BKN','CHA','CHI','CLE','DAL','DEN','DET','GS','HOU','IND','LAC','LAL','MEM','MIA','MIL','MIN','NOP','NYK','OKC','ORL','PHI','PHX','POR','SAC','SA','TOR','UTA','WAS'];
+
+/* Rank list for ordering the player pool (also the offline fallback pool; teams approximate). */
+const RANKS = `Nikola Jokic|DEN|C;Shai Gilgeous-Alexander|OKC|PG;Victor Wembanyama|SA|C;Giannis Antetokounmpo|MIL|PF;Luka Doncic|LAL|PG;Anthony Edwards|MIN|SG;Cade Cunningham|DET|PG;Tyrese Haliburton|IND|PG;Jayson Tatum|BOS|SF;Anthony Davis|DAL|PF;Jalen Johnson|ATL|SF;Domantas Sabonis|SAC|C;Karl-Anthony Towns|NYK|C;Trae Young|ATL|PG;Devin Booker|PHX|SG;Jalen Brunson|NYK|PG;Donovan Mitchell|CLE|SG;Kevin Durant|HOU|SF;Stephen Curry|GS|PG;LeBron James|PHI|SF;James Harden|LAC|PG;Alperen Sengun|HOU|C;Paolo Banchero|ORL|PF;Scottie Barnes|TOR|SF;Evan Mobley|CLE|PF;Chet Holmgren|OKC|C;Jaren Jackson Jr.|MEM|PF;Bam Adebayo|MIA|C;Kawhi Leonard|LAC|SF;Ja Morant|MEM|PG;LaMelo Ball|CHA|PG;Tyrese Maxey|PHI|PG;Joel Embiid|PHI|C;Jamal Murray|DEN|PG;Zion Williamson|NOP|PF;De'Aaron Fox|SA|PG;Pascal Siakam|IND|PF;Franz Wagner|ORL|SF;Lauri Markkanen|UTA|PF;Jalen Williams|OKC|SF;Josh Giddey|CHI|PG;Ivica Zubac|LAC|C;Desmond Bane|ORL|SG;Derrick White|BOS|PG;Jaylen Brown|BOS|SG;Kristaps Porzingis|ATL|C;Amen Thompson|HOU|SG;Cooper Flagg|DAL|SF;Deni Avdija|POR|SF;Darius Garland|CLE|PG;Mikal Bridges|NYK|SF;OG Anunoby|NYK|SF;Myles Turner|MIL|C;Jarrett Allen|CLE|C;Walker Kessler|UTA|C;Nikola Vucevic|CHI|C;Rudy Gobert|MIN|C;Julius Randle|MIN|PF;Zach LaVine|SAC|SG;DeMar DeRozan|SAC|SF;Jimmy Butler|GS|SF;Kyrie Irving|DAL|PG;Dyson Daniels|ATL|SG;Josh Hart|NYK|SG;Brandon Miller|CHA|SF;Jalen Duren|DET|C;Onyeka Okongwu|ATL|C;Austin Reaves|LAL|SG;Coby White|CHI|SG;Immanuel Quickley|TOR|PG;Norman Powell|MIA|SG;Tyler Herro|MIA|SG;Cam Thomas|BKN|SG;Michael Porter Jr.|BKN|SF;Jabari Smith Jr.|HOU|PF;Stephon Castle|SA|PG;Keyonte George|UTA|PG;Payton Pritchard|BOS|PG;Aaron Gordon|DEN|PF;Christian Braun|DEN|SG;Mark Williams|PHX|C;Nic Claxton|BKN|C;Brandon Ingram|TOR|SF;RJ Barrett|TOR|SF;Anfernee Simons|BOS|SG;Jrue Holiday|POR|PG;Shaedon Sharpe|POR|SG;Scoot Henderson|POR|PG;Donovan Clingan|POR|C;Alex Sarr|WAS|C;Bilal Coulibaly|WAS|SF;CJ McCollum|WAS|SG;Kel'el Ware|MIA|C;Andrew Wiggins|MIA|SF;Miles Bridges|CHA|PF;Kon Knueppel|CHA|SG;Dylan Harper|SA|SG;Ace Bailey|UTA|SF;VJ Edgecombe|PHI|SG;Zaccharie Risacher|ATL|SF;Toumani Camara|POR|SF;Isaiah Hartenstein|OKC|C;Luguentz Dort|OKC|SG;Naz Reid|MIN|C;Mike Conley|MIN|PG;Draymond Green|GS|PF;Jonathan Kuminga|GS|PF;Brandin Podziemski|GS|SG;Herbert Jones|NOP|SF;Trey Murphy III|NOP|SF;Jordan Poole|NOP|SG;Dejounte Murray|NOP|PG;Daniel Gafford|DAL|C;Klay Thompson|DAL|SG;Dereck Lively II|DAL|C;Bennedict Mathurin|IND|SG;Andrew Nembhard|IND|PG;Jaden Ivey|DET|SG;Ausar Thompson|DET|SF;Tobias Harris|DET|PF;Kyle Kuzma|MIL|PF;Bobby Portis|MIL|PF;Kevin Porter Jr.|MIL|PG;Grayson Allen|PHX|SG;Dillon Brooks|PHX|SF;Jusuf Nurkic|UTA|C;Collin Sexton|CHA|PG;Malik Monk|SAC|SG;Keegan Murray|SAC|PF;Santi Aldama|MEM|PF;Zach Edey|MEM|C;Jaylen Wells|MEM|SF;Tari Eason|HOU|PF;Fred VanVleet|HOU|PG;Jakob Poeltl|TOR|C;Paul George|PHI|SF;Kelly Oubre Jr.|PHI|SF;Chris Paul|LAC|PG;Bradley Beal|LAC|SG;Russell Westbrook|SAC|PG`
+  .split(';').map((s,i)=>{const [name,team,pos]=s.split('|');return {id:'f'+i,name,team,pos,rank:i+1};});
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'').replace(/(jr|sr|iii|ii|iv)$/,'');
+const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } };
+const lsSet = (k,v) => { try { localStorage.setItem(k,v); } catch(e){} };
+function hash(s){ let h=2166136261; for (let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+function rng(seed){ let a=seed||1; return ()=>{ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+function eligible(slot,pos){ const e=ELIG[slot]; if(!e) return true; return String(pos||'').split(/[\/,-]/).some(p=>e.includes(p.trim())); }
+const fmt = n => (Math.round(n*10)/10).toString();
+
+/* ---------- dates / weeks ---------- */
+function ymd(d){ return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
+function weekStart(w){ if(w===1) return new Date(2026,9,20); const d=new Date(2026,9,26); d.setDate(d.getDate()+7*(w-2)); return d; }
+function weekLen(w){ return w===1?6:7; }
+function weekDates(w){ const s=weekStart(w), out=[]; for(let i=0;i<weekLen(w);i++){ const d=new Date(s); d.setDate(s.getDate()+i); out.push(ymd(d)); } return out; }
+function weekLabel(w){ const s=weekStart(w), e=new Date(s); e.setDate(s.getDate()+weekLen(w)-1); const f=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); return `Week ${w} · ${f(s)}–${f(e)}`; }
+const todayStr = () => ymd(new Date());
+function liveWeek(){ const t=todayStr(); for(let w=1;w<=S.settings.regWeeks;w++){ const d=weekDates(w); if(t<=d[d.length-1]) return w; } return S.settings.regWeeks; }
+const isSim = () => S.settings.statsMode==='sim';
+function curWeek(){ if(!isSim()) return liveWeek(); const s=S.settings; return Math.max(1, Math.min(s.regWeeks, s.simWeek + (s.simDay>0?1:0))); }
+function weekLocked(w){ const s=S.settings; return isSim()? (w<=s.simWeek || (w===s.simWeek+1 && s.simDay>0)) : todayStr()>=weekDates(w)[0]; }
+/* how many days of week w have been "played" in sim mode */
+function simDaysPlayed(w){ const s=S.settings; if(w<=s.simWeek) return weekLen(w); if(w===s.simWeek+1) return Math.min(s.simDay, weekLen(w)); return 0; }
+const dayName = d => DAY_NAMES[(new Date(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6)).getDay()+6)%7];
+function simStatus(){ const s=S.settings; if(s.simWeek>=s.regWeeks) return 'Regular season complete'; const w=s.simWeek+1; return s.simDay>0 ? `Week ${w}, games played through ${dayName(weekDates(w)[s.simDay-1])}` : `Start of Week ${w} — no games played yet`; }
+function simAdvanceDay(){ const s=S.settings; if(s.simWeek>=s.regWeeks) return; let w=s.simWeek, d=s.simDay+1; if(d>=weekLen(w+1)){ w++; d=0; } Store.update({'settings/simWeek':w,'settings/simDay':d}); }
+function simFinishWeek(){ const s=S.settings; if(s.simWeek>=s.regWeeks) return; Store.update({'settings/simWeek':s.simWeek+1,'settings/simDay':0}); }
+function simSet(w,d){ Store.update({'settings/simWeek':Math.max(0,Math.min(S.settings.regWeeks,w)),'settings/simDay':d}); ui.week=null; }
+function weekDone(w){ if(isSim()) return w<=S.settings.simWeek; const d=weekDates(w); return todayStr()>d[d.length-1]; }
+
+/* ---------- store (Firebase or local demo) ---------- */
+let S = null, STORE_MODE = 'local', fbRef = null, bc = null;
+const LS_KEY = 'b3h_'+LEAGUE_ID;
+function setPath(obj,path,val){ const k=path.split('/'); let o=obj; for(let i=0;i<k.length-1;i++){ if(typeof o[k[i]]!=='object'||o[k[i]]===null) o[k[i]]={}; o=o[k[i]]; } if(val===null||val===undefined) delete o[k[k.length-1]]; else o[k[k.length-1]]=val; }
+function normalize(x){ if(!x||!x.settings) return null; x.settings={...DEFAULT_SETTINGS,...x.settings}; x.settings.scoring={...DEFAULT_SETTINGS.scoring,...(x.settings.scoring||{})}; for(const k of ['teams','rosters','lineups','trades','log']) x[k]=x[k]||{}; x.draft=x.draft||{status:'pre',order:Object.keys(x.teams),picks:{}}; x.draft.picks=x.draft.picks||{}; x.draft.order=x.draft.order||Object.keys(x.teams); return x; }
+const Store = {
+  async init(){
+    if (FIREBASE_CONFIG){
+      try{
+        await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js');
+        firebase.initializeApp(FIREBASE_CONFIG);
+        fbRef = firebase.database().ref('leagues/'+LEAGUE_ID);
+        STORE_MODE='firebase';
+        fbRef.on('value', snap => { S = normalize(snap.val()); render(); });
+        return;
+      }catch(e){ console.warn('Firebase failed, using local demo', e); }
+    }
+    STORE_MODE='local';
+    try{ S = normalize(JSON.parse(lsGet(LS_KEY)||'null')); }catch(e){ S=null; }
+    try{ bc = new BroadcastChannel(LS_KEY); bc.onmessage = () => { try{ S=normalize(JSON.parse(lsGet(LS_KEY)||'null')); }catch(e){} render(); }; }catch(e){}
+    render();
+  },
+  update(u){
+    if (STORE_MODE==='firebase'){ fbRef.update(u); return; }
+    for (const k in u) setPath(S,k,u[k]);
+    S = normalize(S); this._save(); render();
+  },
+  replace(obj){
+    if (STORE_MODE==='firebase'){ fbRef.set(obj); return; }
+    S = normalize(obj); this._save(); render();
+  },
+  _save(){ lsSet(LS_KEY, JSON.stringify(S)); try{ bc && bc.postMessage(1); }catch(e){} }
+};
+function logUpdate(u,text){ u['log/'+uid()] = {ts:Date.now(), text}; return u; }
+
+/* ---------- player pool ---------- */
+let POOL = {}, POOL_SRC = 'loading';
+const RANK_BY_NAME = Object.fromEntries(RANKS.map(p=>[norm(p.name),p.rank]));
+async function loadPool(){
+  const cached = lsGet('b3h_pool');
+  if (cached){ try{ const c=JSON.parse(cached); if(Date.now()-c.t<12*3600e3 && Object.keys(c.p).length>200){ POOL=c.p; POOL_SRC='ESPN (cached)'; return; } }catch(e){} }
+  try{
+    const ctl = new AbortController(); setTimeout(()=>ctl.abort(), 9000);
+    const tj = await (await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams',{signal:ctl.signal})).json();
+    const teams = tj.sports[0].leagues[0].teams.map(t=>t.team);
+    const out = {};
+    await Promise.all(teams.map(async t=>{
+      const r = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${t.id}/roster`,{signal:ctl.signal})).json();
+      for (const a of (r.athletes||[])){
+        const items = a.items ? a.items : [a];
+        for (const p of items){
+          out[p.id] = {id:String(p.id), name:p.displayName||p.fullName, team:t.abbreviation, pos:(p.position&&p.position.abbreviation)||'UTIL',
+            rank: RANK_BY_NAME[norm(p.displayName||p.fullName)] || 999, inj:(p.injuries&&p.injuries[0]&&p.injuries[0].status)||''};
+        }
+      }
+    }));
+    if (Object.keys(out).length < 200) throw new Error('small pool');
+    // unranked players get ordered after the ranked list
+    let n = RANKS.length+1; Object.values(out).filter(p=>p.rank===999).sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>p.rank=n++);
+    POOL = out; POOL_SRC = 'ESPN live rosters';
+    lsSet('b3h_pool', JSON.stringify({t:Date.now(), p:out}));
+  }catch(e){
+    POOL = Object.fromEntries(RANKS.map(p=>[p.id,p])); POOL_SRC = 'Built-in list (ESPN unreachable)';
+  }
+}
+function pInfo(pid){ if(POOL[pid]) return POOL[pid]; for(const t in S.rosters){ if(S.rosters[t][pid]) return {id:pid,...S.rosters[t][pid]}; } return {id:pid,name:'Unknown',team:'',pos:'',rank:999}; }
+function ownerOf(pid){ for(const t in S.rosters) if(S.rosters[t][pid]) return t; return null; }
+const rosterIds = t => Object.keys(S.rosters[t]||{}).sort((a,b)=>pInfo(a).rank-pInfo(b).rank);
+const teamIds = () => Object.keys(S.teams).sort((a,b)=>+a.slice(1)-+b.slice(1));
+const tName = t => (S.teams[t]&&S.teams[t].name)||t;
+const snap = p => ({name:p.name, team:p.team, pos:p.pos, rank:p.rank});
+
+/* ---------- stats: simulated + live ESPN ---------- */
+function teamGamesSim(team,w){
+  const r = rng(hash(team+'|'+w+'|'+(S.settings.simSeed||1))), dates = weekDates(w);
+  const n = w===1 ? (r()<.5?2:3) : (r()<.45?3:4);
+  const idx = [...dates.keys()].sort(()=>r()-.5).slice(0,n).sort((a,b)=>a-b);
+  return idx.map(i=>({date:dates[i], opp: NBA[Math.floor(r()*NBA.length)]})).filter(g=>g.opp!==team);
+}
+function simLine(pid,info,date){
+  const r = rng(hash(pid+'@'+date+'|'+(S.settings.simSeed||1)));
+  if (r() < .07) return null; // DNP
+  const B = Math.max(14, 62 - 0.35*Math.min(info.rank||200,140));
+  const pos = info.pos||'';
+  const prof = /C/.test(pos)?{reb:.22,ast:.06,stl:.014,blk:.034} : /PG|^G$/.test(pos)?{reb:.075,ast:.165,stl:.026,blk:.006} : {reb:.115,ast:.08,stl:.02,blk:.013};
+  const f = 0.55 + r()*0.9, j = () => 0.7 + r()*0.6;
+  const PTS = Math.round(B*.4*f*j()), FGM = Math.round(PTS*.37*j());
+  return {PTS, FGM, REB:Math.round(B*prof.reb*f*j()), AST:Math.round(B*prof.ast*f*j()), STL:Math.round(B*prof.stl*f*j()*1.2), BLK:Math.round(B*prof.blk*f*j()*1.2), TO:Math.round(B*.045*f*j())};
+}
+const LIVE = {}; // date -> {byId, byName, done}
+const SCHED = {}; // date -> [team abbrs playing that day] (live mode)
+function schedFrom(sb){ const out=[]; for(const ev of (sb.events||[])) for(const c of (((ev.competitions||[])[0]||{}).competitors||[])) if(c.team) out.push(c.team.abbreviation); return out; }
+/* number of NBA games a player's team has in week w */
+function gamesThisWeek(pid,w){ const p=pInfo(pid); if(isSim()) return teamGamesSim(p.team,w).length; const ds=weekDates(w); if(!ds.some(d=>SCHED[d])) return 3.5; return ds.filter(d=>SCHED[d]&&SCHED[d].includes(p.team)).length; }
+let liveLoading = false;
+async function loadLiveWeek(w){
+  if (liveLoading) return; liveLoading = true;
+  const t = todayStr();
+  try{
+    for (const d of weekDates(w)){
+      if (d > t){ // future day: just learn which NBA teams play (for games-this-week counts)
+        if (!SCHED[d]){ const c=lsGet('b3h_sched_'+d); if(c) SCHED[d]=JSON.parse(c); else { const sb=await (await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates='+d)).json(); SCHED[d]=schedFrom(sb); lsSet('b3h_sched_'+d, JSON.stringify(SCHED[d])); } }
+        continue;
+      }
+      if (LIVE[d] && LIVE[d].done) continue;
+      const c = lsGet('b3h_box_'+d); if (c){ try{ LIVE[d]=JSON.parse(c); if(LIVE[d].done) continue; }catch(e){} }
+      const sb = await (await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates='+d)).json();
+      const day = {byId:{}, byName:{}, done:true}; SCHED[d] = schedFrom(sb);
+      for (const ev of (sb.events||[])){
+        const st = ev.status&&ev.status.type&&ev.status.type.state;
+        if (st !== 'post') day.done = false;
+        if (st === 'pre') continue;
+        const sum = await (await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event='+ev.id)).json();
+        parseBox(sum, day, d, st==='in');
+      }
+      LIVE[d] = day; if (day.done) lsSet('b3h_box_'+d, JSON.stringify(day));
+    }
+  }catch(e){ console.warn('live stats error', e); }
+  liveLoading = false; render();
+}
+function parseBox(sum, day, date, live){
+  const comps = (((sum.header||{}).competitions||[])[0]||{}).competitors||[];
+  const abbrs = comps.map(c=>c.team&&c.team.abbreviation);
+  for (const tp of ((sum.boxscore||{}).players||[])){
+    const ab = tp.team&&tp.team.abbreviation, opp = abbrs.find(a=>a!==ab)||'';
+    for (const st of (tp.statistics||[])){
+      const keys = st.keys||[], labels = st.labels||st.names||[];
+      for (const a of (st.athletes||[])){
+        if (!a.stats || !a.stats.length || a.didNotPlay) continue;
+        const get = (k,l) => { let i=keys.indexOf(k); if(i<0) i=labels.indexOf(l); return i<0?'0':a.stats[i]; };
+        const line = {PTS:+get('points','PTS')||0, FGM:parseInt(get('fieldGoalsMade-fieldGoalsAttempted','FG'))||0, REB:+get('rebounds','REB')||0,
+          AST:+get('assists','AST')||0, STL:+get('steals','STL')||0, BLK:+get('blocks','BLK')||0, TO:+get('turnovers','TO')||0};
+        const g = {date, opp, line, live};
+        day.byId[a.athlete.id] = g; day.byName[norm(a.athlete.displayName)] = g;
+      }
+    }
+  }
+}
+function fpts(line){
+  const sc = S.settings.scoring; let p = 0;
+  for (const k of ['PTS','FGM','REB','AST','STL','BLK','TO']) p += (line[k]||0)*(sc[k]||0);
+  const tens = ['PTS','REB','AST','STL','BLK'].filter(k=>(line[k]||0)>=10).length;
+  if (tens>=2) p += sc.DD||0;
+  if (tens>=3) p += sc.TD||0;
+  return p;
+}
+function playerGames(pid,w){
+  const info = pInfo(pid);
+  if (isSim()){
+    const played = weekDates(w).slice(0, simDaysPlayed(w));
+    return teamGamesSim(info.team,w).filter(g=>played.includes(g.date)).map(g=>{ const line=simLine(pid,info,g.date); return line?{...g,line}:null; }).filter(Boolean);
+  }
+  const out = [];
+  for (const d of weekDates(w)){ const day=LIVE[d]; if(!day) continue; const g=day.byId[pid]||day.byName[norm(info.name)]; if(g) out.push(g); }
+  return out;
+}
+const MEMO = new Map();
+function teamWeek(t,w){
+  const key = t+'|'+w; if (MEMO.has(key)) return MEMO.get(key);
+  const lu = lineupFor(t,w), cap = S.settings.gameCap;
+  let total = 0;
+  const rows = S.settings.slots.map((slot,i)=>{
+    const pid = lu[i]; if (!pid) return {slot, pid:null, games:[], pts:0};
+    const games = playerGames(pid,w).map(g=>({...g, fp:fpts(g.line)}));
+    const best = games.map((g,j)=>[g.fp,j]).sort((a,b)=>b[0]-a[0]).slice(0,cap).map(x=>x[1]);
+    games.forEach((g,j)=>g.counted = best.includes(j));
+    const pts = games.filter(g=>g.counted).reduce((s,g)=>s+g.fp,0);
+    total += pts;
+    return {slot, pid, games, pts};
+  });
+  const res = {total, rows}; MEMO.set(key,res); return res;
+}
+
+/* ---------- lineups ---------- */
+const AUTO_MODES = {
+  proj:  {label:'Smart (avg × games, max 3)', desc:"Projects each player's counted points this week: average × games this week (capped at 3). Built for the best-3 rule."},
+  avg:   {label:'Highest average points', desc:'Starts the players with the best fantasy points per game.'},
+  total: {label:'Most total points (season)', desc:'Starts the players with the most fantasy points so far this season.'},
+  games: {label:'Most games this week', desc:'Starts whoever plays the most games this week; ties go to the higher average.'}
+};
+function projAvg(p){ return Math.max(14, 62-0.35*Math.min(p.rank||200,140))*0.85; }
+/* stats from weeks BEFORE week w only, so an auto lineup never changes after the fact */
+function priorStats(pid,w){
+  const key='ps|'+pid+'|'+w; if (MEMO.has(key)) return MEMO.get(key);
+  let n=0,tot=0; for (let k=1;k<w;k++) for (const g of playerGames(pid,k)){ n++; tot+=fpts(g.line); }
+  const r = {n, tot, avg: n>=2 ? tot/n : projAvg(pInfo(pid))}; MEMO.set(key,r); return r;
+}
+function autoMetric(pid,w,mode){
+  const ps=priorStats(pid,w), g=gamesThisWeek(pid,w), out=/out/i.test(pInfo(pid).inj||'');
+  if (mode==='avg') return ps.avg - (out?1e4:0);
+  if (mode==='total') return ps.tot + ps.avg/1e3 - (out?1e6:0);
+  if (mode==='games') return (out?0:g)*1e3 + ps.avg;
+  return out ? -1 : ps.avg*Math.min(g, S.settings.gameCap);
+}
+function autoLineup(t,w,mode){
+  w = w||curWeek(); mode = AUTO_MODES[mode]?mode:'proj';
+  const slots = S.settings.slots, lu = slots.map(()=>null), tight = s => ELIG[s]?ELIG[s].length:99;
+  const ros = rosterIds(t).sort((a,b)=>autoMetric(b,w,mode)-autoMetric(a,w,mode));
+  for (const p of ros){
+    const open = slots.map((s,i)=>i).filter(i=>!lu[i]&&eligible(slots[i],pInfo(p).pos)).sort((a,b)=>tight(slots[a])-tight(slots[b]));
+    if (open.length) lu[open[0]] = p;
+  }
+  return lu;
+}
+function autoSet(t,w,mode){
+  const lu = autoLineup(t,w,mode), obj = {}; lu.forEach((p,k)=>{ if(p) obj[k]=p; });
+  Store.update({['lineups/'+t+'/w'+w]: obj});
+}
+function lineupFor(t,w){
+  const ros = new Set(Object.keys(S.rosters[t]||{}));
+  const ap = S.teams[t] && S.teams[t].autopilot;
+  if (ap && !(S.lineups[t] && S.lineups[t]['w'+w])) return autoLineup(t,w,ap);
+  for (let k=w; k>=1; k--){
+    const saved = S.lineups[t] && S.lineups[t]['w'+k];
+    if (saved){
+      const lu = S.settings.slots.map((s,i)=>{ const p=saved[i]; return p&&ros.has(p)?p:null; });
+      // fill holes from bench
+      const used = new Set(lu.filter(Boolean));
+      lu.forEach((p,i)=>{ if(!p){ const b=rosterIds(t).find(x=>!used.has(x)&&eligible(S.settings.slots[i],pInfo(x).pos)); if(b){lu[i]=b;used.add(b);} } });
+      return lu;
+    }
+  }
+  return autoLineup(t,w,'proj');
+}
+
+/* ---------- schedule / standings ---------- */
+function roundRobin(ids){ let a=ids.slice(); if(a.length%2) a.push(null); const n=a.length, rounds=[]; for(let r=0;r<n-1;r++){ const pr=[]; for(let i=0;i<n/2;i++) pr.push([a[i],a[n-1-i]]); rounds.push(pr); a=[a[0],a[n-1],...a.slice(1,n-1)]; } return rounds; }
+function matchups(w){ const rr = roundRobin(teamIds()); return rr[(w-1)%rr.length].filter(p=>p[0]&&p[1]); }
+function standings(){
+  const st = {}; teamIds().forEach(t=>st[t]={t,w:0,l:0,tie:0,pf:0,pa:0});
+  for (let w=1; w<=S.settings.regWeeks; w++){
+    if (!weekDone(w)) continue;
+    for (const [a,b] of matchups(w)){
+      const A=teamWeek(a,w).total, B=teamWeek(b,w).total;
+      st[a].pf+=A; st[a].pa+=B; st[b].pf+=B; st[b].pa+=A;
+      if (A>B){st[a].w++;st[b].l++;} else if (B>A){st[b].w++;st[a].l++;} else {st[a].tie++;st[b].tie++;}
+    }
+  }
+  return Object.values(st).sort((x,y)=>(y.w+y.tie/2)-(x.w+x.tie/2)||y.pf-x.pf);
+}
+
+/* ---------- draft ---------- */
+function draftInfo(){
+  const N = S.draft.order.length, n = Object.keys(S.draft.picks).length, total = N*S.settings.rosterSize;
+  const rnd = Math.floor(n/N), k = n%N, team = n<total ? (rnd%2===0 ? S.draft.order[k] : S.draft.order[N-1-k]) : null;
+  return {N, n, total, rnd:rnd+1, pickInRnd:k+1, team};
+}
+function bestAvailable(){ return Object.values(POOL).filter(p=>!ownerOf(p.id)).sort((a,b)=>a.rank-b.rank)[0]; }
+function draftUpdates(pid, u, picksSoFar){
+  const N=S.draft.order.length, n=picksSoFar, total=N*S.settings.rosterSize, rnd=Math.floor(n/N), k=n%N;
+  const team = rnd%2===0 ? S.draft.order[k] : S.draft.order[N-1-k];
+  const p = POOL[pid];
+  u['draft/picks/'+n] = {team, pid, ts:Date.now()};
+  u['rosters/'+team+'/'+pid] = snap(p);
+  if (n+1 >= total) u['draft/status'] = 'done';
+  return team;
+}
+function makePick(pid){
+  const d = draftInfo(); if (!d.team || ownerOf(pid)) return;
+  const u = {}; const team = draftUpdates(pid,u,d.n);
+  logUpdate(u, `${tName(team)} drafted ${POOL[pid].name} (R${d.rnd} P${d.pickInRnd})`);
+  Store.update(u);
+}
+function simRestOfDraft(){
+  const u = {}; let n = draftInfo().n; const total = draftInfo().total;
+  const avail = Object.values(POOL).filter(p=>!ownerOf(p.id)).sort((a,b)=>a.rank-b.rank);
+  while (n < total && avail.length){ draftUpdates(avail.shift().id, u, n); n++; }
+  logUpdate(u,'Commissioner auto-drafted the remaining picks');
+  Store.update(u);
+}
+function undoPick(){
+  const n = draftInfo().n; if (!n) return;
+  const pk = S.draft.picks[n-1];
+  Store.update(logUpdate({['draft/picks/'+(n-1)]:null, ['rosters/'+pk.team+'/'+pk.pid]:null, 'draft/status':'live'}, `Undo pick: ${pInfo(pk.pid).name}`));
+}
+
+/* ---------- transactions ---------- */
+function addPlayer(t, pid, dropPid){
+  const u = {}; const p = POOL[pid];
+  u['rosters/'+t+'/'+pid] = snap(p);
+  if (dropPid) u['rosters/'+t+'/'+dropPid] = null;
+  logUpdate(u, `${tName(t)} added ${p.name}` + (dropPid?`, dropped ${pInfo(dropPid).name}`:''));
+  Store.update(u);
+}
+function dropPlayer(t,pid){ Store.update(logUpdate({['rosters/'+t+'/'+pid]:null}, `${tName(t)} dropped ${pInfo(pid).name}`)); }
+function acceptTrade(id){
+  const tr = S.trades[id]; if (!tr) return;
+  const give = Object.keys(tr.give||{}), get = Object.keys(tr.get||{});
+  if (give.some(p=>ownerOf(p)!==tr.from) || get.some(p=>ownerOf(p)!==tr.to)) { Store.update({['trades/'+id+'/status']:'failed'}); return toast('Trade failed — players no longer on those rosters.'); }
+  const size = S.settings.rosterSize;
+  if (Object.keys(S.rosters[tr.from]).length - give.length + get.length > size || Object.keys(S.rosters[tr.to]).length - get.length + give.length > size) return toast('A roster would go over '+size+' players. Drop someone first.');
+  const u = {['trades/'+id+'/status']:'accepted'};
+  give.forEach(p=>{ u['rosters/'+tr.from+'/'+p]=null; u['rosters/'+tr.to+'/'+p]=S.rosters[tr.from][p]; });
+  get.forEach(p=>{ u['rosters/'+tr.to+'/'+p]=null; u['rosters/'+tr.from+'/'+p]=S.rosters[tr.to][p]; });
+  logUpdate(u, `TRADE: ${tName(tr.from)} sends ${give.map(p=>pInfo(p).name).join(', ')||'nothing'} to ${tName(tr.to)} for ${get.map(p=>pInfo(p).name).join(', ')||'nothing'}`);
+  Store.update(u);
+}
+
+/* ---------- UI state ---------- */
+const ui = { tab: lsGet('b3h_tab')||'matchup', week:null, open:null, q:'', pos:'ALL', avail:true, teamView:null, tradeWith:null, tradeGive:new Set(), tradeGet:new Set() };
+let ME = lsGet('b3h_me')||'t0';
+const isCommish = () => lsGet('b3h_commish')==='1';
+const canEdit = t => t===ME || isCommish();
+function toast(msg){ openModal(`<p>${esc(msg)}</p><div class="row"><button class="btn pri" onclick="closeModal()">OK</button></div>`); }
+function openModal(html){ $('#modalBody').innerHTML = html; $('#modal').style.display='flex'; }
+function closeModal(){ $('#modal').style.display='none'; }
+$('#modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
+
+const TABS = [['matchup','Scoreboard'],['team','My Team'],['players','Players'],['draft','Draft'],['mock','Mock Draft'],['sim','Sim Lab'],['trades','Trades'],['standings','Standings'],['league','League']];
+function go(t){ ui.tab=t; lsSet('b3h_tab',t); render(); window.scrollTo(0,0); }
+function weekSel(id){ const cw=curWeek(), w=ui.week||cw; let o=''; for(let i=1;i<=S.settings.regWeeks;i++) o+=`<option value="${i}" ${i===w?'selected':''}>${esc(weekLabel(i))}${i===cw?' (current)':''}</option>`; return `<select id="${id}" onchange="ui.week=+this.value;render()">${o}</select>`; }
+
+/* ---------- render ---------- */
+let lastLiveReq = '';
+function render(){
+  MEMO.clear();
+  $('#meSel').parentElement.style.display = S ? '' : 'none';
+  if (!S && ui.tab==='mock'){ $('#tabs').innerHTML=`<button class="on">Mock Draft</button><button onclick="go('matchup')">← Create league</button>`; $('#view').innerHTML=vMock(); renderMockList(); return; }
+  if (!S){ renderSetup(); return; }
+  if (!S.teams[ME]) ME = teamIds()[0];
+  $('#lgname').textContent = S.settings.name;
+  $('#meSel').innerHTML = teamIds().map(t=>`<option value="${t}" ${t===ME?'selected':''}>${esc(tName(t))}</option>`).join('');
+  const mt = $('#modeTag'); mt.className = 'tag '+(isSim()?'sim':'live'); mt.textContent = (isSim()?'SIM STATS':'LIVE STATS')+(STORE_MODE==='firebase'?' · ONLINE':' · DEMO (this browser)');
+  $('#tabs').innerHTML = TABS.map(([k,l])=>`<button class="${ui.tab===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('');
+  const w = ui.week||curWeek();
+  if (!isSim()){ const key=w+'|'+todayStr(); if(key!==lastLiveReq){ lastLiveReq=key; loadLiveWeek(w); } }
+  const v = {matchup:vMatchup, team:vTeam, players:vPlayers, draft:vDraft, mock:vMock, sim:vSim, trades:vTrades, standings:vStandings, league:vLeague}[ui.tab] || vMatchup;
+  $('#view').innerHTML = v();
+  if (ui.tab==='players' || ui.tab==='draft') renderPlayerList();
+  if (ui.tab==='mock') renderMockList();
+  if (ui.tab==='sim') renderCalc();
+}
+
+function renderSetup(){
+  $('#tabs').innerHTML=''; $('#modeTag').textContent = STORE_MODE==='firebase'?'ONLINE':'DEMO';
+  $('#view').innerHTML = `<div class="card"><h2>Create your league</h2>
+  <p class="muted">Head-to-head points. Every starter's <b>best ${DEFAULT_SETTINGS.gameCap} games</b> each week count — extra games are dropped automatically.</p>
+  <div class="row"><label>League name <input id="sName" value="${esc(DEFAULT_SETTINGS.name)}"></label>
+  <label>Teams <select id="sTeams">${[4,6,8,10,12,14].map(n=>`<option ${n===10?'selected':''}>${n}</option>`).join('')}</select></label>
+  <button class="btn pri" onclick="createLeague()">Create league</button></div>
+  <p class="muted small" style="margin-top:12px">Just want to practice? <button class="btn sm" onclick="go('mock')">Try a mock draft</button></p></div>`;
+}
+function createLeague(){
+  const n = +$('#sTeams').value, teams = {};
+  for (let i=0;i<n;i++) teams['t'+i] = {name: 'Team '+(i+1)};
+  const ids = Object.keys(teams);
+  Store.replace({settings:{...DEFAULT_SETTINGS, name:$('#sName').value||DEFAULT_SETTINGS.name, numTeams:n}, teams, rosters:{}, lineups:{}, trades:{}, log:{}, draft:{status:'pre', order:ids, picks:{}}, created:Date.now()});
+  go('draft');
+}
+
+/* Scoreboard */
+function vMatchup(){
+  const w = ui.week||curWeek();
+  if (S.draft.status!=='done') return `<div class="banner">Draft isn't finished yet — head to the Draft tab.</div>`;
+  let ms = matchups(w); ms.sort((a,b)=> (b.includes(ME)?1:0)-(a.includes(ME)?1:0));
+  const noStats = isSim() ? simDaysPlayed(w)===0 : todayStr()<weekDates(w)[0];
+  let h = `<div class="row" style="justify-content:space-between"><h2>Scoreboard</h2>${weekSel('wk')}</div>
+  <p class="muted small">Each starter's best ${S.settings.gameCap} games count. <span class="chip c">green</span> = counted, <span class="chip x">red</span> = dropped (4th+ game).${noStats?' <b>No games played yet this week.</b>':''}${!isSim()&&liveLoading?' Loading live box scores…':''}</p>`;
+  for (const [a,b] of ms){
+    const A = teamWeek(a,w), B = teamWeek(b,w), key = a+b+w, open = ui.open===key || (ui.open===null && (a===ME||b===ME));
+    h += `<div class="card"><div class="mu" onclick="ui.open=(ui.open==='${key}'?'none':'${key}');render()">
+      <div><b>${esc(tName(a))}</b></div><div class="s"><span class="${A.total>B.total?'win':''}">${fmt(A.total)}</span> <span class="muted">–</span> <span class="${B.total>A.total?'win':''}">${fmt(B.total)}</span></div><div class="r"><b>${esc(tName(b))}</b></div></div>
+      ${open?`<div class="grid2" style="margin-top:12px">${detail(A)}${detail(B)}</div>`:''}</div>`;
+  }
+  return h;
+}
+function detail(T){
+  return `<div class="tw"><table><tr><th>Slot</th><th>Player</th><th>Games</th><th class="num">Pts</th></tr>${T.rows.map(r=>{
+    const p = r.pid?pInfo(r.pid):null;
+    return `<tr><td><span class="pos">${r.slot}</span></td><td>${p?`${esc(p.name)} <span class="muted small">${esc(p.team)}</span>`:'<span class="muted">Empty</span>'}</td>
+    <td>${r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" title="${g.date} vs ${g.opp}: ${g.line.PTS}p ${g.line.REB}r ${g.line.AST}a">${fmt(g.fp)}</span>`).join('')||'<span class="muted small">—</span>'}</td>
+    <td class="num"><b>${fmt(r.pts)}</b></td></tr>`; }).join('')}<tr><td></td><td><b>Total</b></td><td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>`;
+}
+
+/* My Team */
+function vTeam(){
+  const t = ui.teamView && S.teams[ui.teamView] ? ui.teamView : ME;
+  const w = ui.week||curWeek(), locked = weekLocked(w) && !isCommish(), edit = canEdit(t) && !locked;
+  const T = teamWeek(t,w), lu = lineupFor(t,w), ros = rosterIds(t), bench = ros.filter(p=>!lu.includes(p));
+  let h = `<div class="row" style="justify-content:space-between"><h2>${esc(tName(t))}</h2><div class="row">
+    <select onchange="ui.teamView=this.value;render()">${teamIds().map(x=>`<option value="${x}" ${x===t?'selected':''}>${esc(tName(x))}</option>`).join('')}</select>${weekSel('wk2')}</div></div>
+    <p class="muted small">Lineups are set once per week and lock when the week starts. ${locked?'<b>This week is locked.</b>':edit?'Change a slot with the dropdown — players swap automatically.':''} Roster ${ros.length}/${S.settings.rosterSize}.</p>
+    ${canEdit(t)?`<div class="card"><div class="row">
+      <b>Auto-set lineup</b>
+      <select id="amode" onchange="lsSet('b3h_automode',this.value);$('#adesc').textContent=AUTO_MODES[this.value].desc">${Object.entries(AUTO_MODES).map(([k,m])=>`<option value="${k}" ${k===(lsGet('b3h_automode')||'proj')?'selected':''}>${m.label}</option>`).join('')}</select>
+      <button class="btn pri" ${edit?'':'disabled'} onclick="autoSet('${t}',${w},$('#amode').value)">Auto-set Week ${w}</button>
+      <label class="small"><input type="checkbox" ${S.teams[t].autopilot?'checked':''} onchange="Store.update({['teams/${t}/autopilot']:this.checked?$('#amode').value:null})"> Autopilot (auto-set every week I don't set myself)</label>
+    </div><p id="adesc" class="muted small" style="margin:6px 0 0">${AUTO_MODES[lsGet('b3h_automode')||'proj'].desc}${S.teams[t].autopilot?` <b>Autopilot is on (${AUTO_MODES[S.teams[t].autopilot].label}).</b>`:''}</p></div>`:''}
+    <div class="card tw"><table><tr><th>Slot</th><th>Player</th><th>NBA games</th><th>Best ${S.settings.gameCap}</th><th class="num">Pts</th></tr>`;
+  S.settings.slots.forEach((slot,i)=>{
+    const r = T.rows[i], pid = lu[i], p = pid?pInfo(pid):null;
+    const nGames = p ? gamesThisWeek(pid,w) : 0;
+    const cell = edit ? `<select onchange="setSlot('${t}',${w},${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos)).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})</option>`).join('')}</select>`
+      : (p?`${esc(p.name)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>`:'<span class="muted">Empty</span>');
+    h += `<tr><td><span class="pos">${slot}</span></td><td>${cell}</td><td>${p?nGames+(nGames>S.settings.gameCap?' <span class="muted small">(1 extra)</span>':''):''}</td>
+      <td>${r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}">${fmt(g.fp)}</span>`).join('')}</td><td class="num"><b>${fmt(r.pts)}</b></td></tr>`;
+  });
+  h += `<tr><td></td><td><b>Total</b></td><td></td><td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>
+    <h3>Bench</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${esc(i.name)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>`;
+  return h;
+}
+function setSlot(t,w,i,pid){
+  const lu = lineupFor(t,w).slice(), j = pid ? lu.indexOf(pid) : -1;
+  if (j>=0 && j!==i){ if (lu[i] && !eligible(S.settings.slots[j], pInfo(lu[i]).pos)) lu[j]=null; else lu[j]=lu[i]; }
+  lu[i] = pid||null;
+  const obj = {}; lu.forEach((p,k)=>{ if(p) obj[k]=p; });
+  Store.update({['lineups/'+t+'/w'+w]: obj});
+}
+function confirmDrop(t,pid){ openModal(`<h3>Drop ${esc(pInfo(pid).name)}?</h3><p class="muted">He goes straight to free agency.</p><div class="row"><button class="btn danger" onclick="closeModal();dropPlayer('${t}','${pid}')">Drop</button><button class="btn" onclick="closeModal()">Cancel</button></div>`); }
+
+/* Players + draft list */
+function vPlayers(){
+  return `<h2>Players</h2>${filterBar()}<div id="plist" class="card tw"></div>`;
+}
+function filterBar(){
+  return `<div class="row" style="margin-bottom:10px"><input id="pq" placeholder="Search players" value="${esc(ui.q)}" oninput="ui.q=this.value;renderPlayerList()">
+  <select onchange="ui.pos=this.value;renderPlayerList()">${['ALL','PG','SG','SF','PF','C','G','F'].map(p=>`<option ${p===ui.pos?'selected':''}>${p}</option>`).join('')}</select>
+  ${ui.tab==='players'?`<label class="small"><input type="checkbox" ${ui.avail?'checked':''} onchange="ui.avail=this.checked;renderPlayerList()"> Free agents only</label>`:''}
+  <span class="muted small">${Object.keys(POOL).length} players · ${esc(POOL_SRC)}</span></div>`;
+}
+function avgFp(pid){
+  let n=0,s=0; const last = isSim()? curWeek() : liveWeek();
+  for (let w=Math.max(1,last-2); w<=last; w++) for (const g of playerGames(pid,w)){ n++; s+=fpts(g.line); }
+  return n? s/n : null;
+}
+function renderPlayerList(){
+  const el = $('#plist'); if (!el) return;
+  const q = norm(ui.q), draft = ui.tab==='draft';
+  let list = Object.values(POOL).filter(p=>(!q||norm(p.name).includes(q)) && (ui.pos==='ALL'||eligible(ui.pos,p.pos)));
+  if (draft || ui.avail) list = list.filter(p=>!ownerOf(p.id));
+  list.sort((a,b)=>a.rank-b.rank); list = list.slice(0,100);
+  const d = draftInfo(), myPick = d.team && (d.team===ME || isCommish()) && S.draft.status==='live';
+  const done = S.draft.status==='done', full = Object.keys(S.rosters[ME]||{}).length >= S.settings.rosterSize;
+  el.innerHTML = `<table><tr><th>Rk</th><th>Player</th><th>Pos</th><th>NBA</th>${draft?'':'<th>Owner</th><th class="num">Avg FP</th>'}<th></th></tr>${list.map(p=>{
+    const own = ownerOf(p.id), a = draft? null : avgFp(p.id);
+    let btn = '';
+    if (draft) btn = `<button class="btn sm pri" ${myPick?'':'disabled'} onclick="makePick('${p.id}')">Draft</button>`;
+    else if (!own && done) btn = `<button class="btn sm pri" onclick="${full?`pickDrop('${p.id}')`:`addPlayer(ME,'${p.id}')`}">Add</button>`;
+    return `<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${esc(p.name)}${p.inj?` <span class="muted small">${esc(p.inj)}</span>`:''}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td>
+    ${draft?'':`<td>${own?esc(tName(own)):'<span class="muted">FA</span>'}</td><td class="num">${a===null?'—':fmt(a)}</td>`}<td class="num">${btn}</td></tr>`;}).join('')}</table>`;
+}
+function pickDrop(pid){
+  openModal(`<h3>Add ${esc(POOL[pid].name)}</h3><p class="muted">Your roster is full — pick someone to drop.</p>${rosterIds(ME).map(x=>`<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(pInfo(x).name)} <span class="muted small">${esc(pInfo(x).pos)}</span></span><button class="btn sm danger" onclick="closeModal();addPlayer(ME,'${pid}','${x}')">Drop</button></div>`).join('')}<div class="row" style="margin-top:10px"><button class="btn" onclick="closeModal()">Cancel</button></div>`);
+}
+
+/* Draft */
+function vDraft(){
+  const d = draftInfo(), st = S.draft.status, cm = isCommish();
+  let h = `<h2>Draft</h2>`;
+  if (st==='pre'){
+    h += `<div class="card"><p>Snake draft · ${S.settings.rosterSize} rounds · ${d.N} teams.</p>
+      <h3>Draft order</h3><ol>${S.draft.order.map(t=>`<li>${esc(tName(t))}</li>`).join('')}</ol>
+      <div class="row">${cm?`<button class="btn" onclick="randomizeOrder()">Randomize order</button><button class="btn pri" onclick="Store.update(logUpdate({'draft/status':'live'},'Draft started'))">Start draft</button>`:'<span class="muted">Waiting for the commissioner to start the draft. (Turn on Commissioner mode in the League tab.)</span>'}</div></div>`;
+    return h;
+  }
+  if (st==='live') h += `<div class="banner">On the clock: ${esc(tName(d.team))} — Round ${d.rnd}, pick ${d.pickInRnd}${d.team===ME?' · THAT\'S YOU':''}</div>
+    <div class="row" style="margin-bottom:10px">${(d.team===ME||cm)?`<button class="btn" onclick="makePick(bestAvailable().id)">Auto-pick best available</button>`:''}${cm?`<button class="btn" onclick="simRestOfDraft()">Commish: auto-draft the rest</button><button class="btn danger" onclick="undoPick()">Undo last pick</button>`:''}</div>`;
+  else h += `<div class="banner">Draft complete. Set your lineup in My Team.</div>${cm?`<div class="row" style="margin-bottom:10px"><button class="btn danger" onclick="undoPick()">Undo last pick</button></div>`:''}`;
+  // board
+  const N = d.N; let b = `<div class="tw"><div class="board" style="grid-template-columns:repeat(${N},minmax(92px,1fr))">` + S.draft.order.map(t=>`<div class="hd">${esc(tName(t))}</div>`).join('');
+  for (let r=0;r<S.settings.rosterSize;r++) for (let c=0;c<N;c++){
+    const n = r%2===0 ? r*N+c : r*N+(N-1-c), pk = S.draft.picks[n], team = S.draft.order[c];
+    b += `<div class="${team===ME?'me':''}">${pk?`<b>${esc(pInfo(pk.pid).name)}</b><br><span class="muted">${esc(pInfo(pk.pid).pos)} · ${r+1}.${(n%N)+1}</span>`:`<span class="muted">${r+1}.${(n%N)+1}</span>`}</div>`;
+  }
+  b += `</div></div>`;
+  if (st==='live') h += `<div class="grid2"><div>${filterBar()}<div id="plist" class="card tw"></div></div><div class="card">${b}</div></div>`;
+  else h += `<div class="card">${b}</div>`;
+  return h;
+}
+function randomizeOrder(){ const o=S.draft.order.slice().sort(()=>Math.random()-.5); Store.update({'draft/order':o}); }
+
+/* Trades */
+function vTrades(){
+  if (S.draft.status!=='done') return `<h2>Trades</h2><div class="banner">Trades open after the draft.</div>`;
+  const other = ui.tradeWith && ui.tradeWith!==ME ? ui.tradeWith : teamIds().find(t=>t!==ME);
+  const list = (t,set,name) => rosterIds(t).map(p=>`<label class="row small" style="margin:3px 0"><input type="checkbox" ${set.has(p)?'checked':''} onchange="ui.${name}[this.checked?'add':'delete']('${p}')"> ${esc(pInfo(p).name)} <span class="muted">${esc(pInfo(p).pos)}</span></label>`).join('');
+  let h = `<h2>Trades</h2><div class="card"><h3>Propose a trade</h3><div class="row" style="margin-bottom:8px">Trade with <select onchange="ui.tradeWith=this.value;ui.tradeGet.clear();render()">${teamIds().filter(t=>t!==ME).map(t=>`<option value="${t}" ${t===other?'selected':''}>${esc(tName(t))}</option>`).join('')}</select></div>
+    <div class="grid2"><div><b>You send</b>${list(ME,ui.tradeGive,'tradeGive')}</div><div><b>You get</b>${list(other,ui.tradeGet,'tradeGet')}</div></div>
+    <div class="row" style="margin-top:10px"><button class="btn pri" onclick="proposeTrade('${other}')">Send offer</button></div></div><h3>Offers</h3>`;
+  const trs = Object.entries(S.trades).sort((a,b)=>b[1].ts-a[1].ts);
+  if (!trs.length) h += `<p class="muted">No trades yet.</p>`;
+  for (const [id,tr] of trs){
+    const names = o => Object.keys(o||{}).map(p=>esc(pInfo(p).name)).join(', ')||'nothing';
+    let act = '';
+    if (tr.status==='pending'){
+      if (tr.to===ME || isCommish()) act += `<button class="btn sm pri" onclick="acceptTrade('${id}')">Accept${tr.to!==ME?' (as '+esc(tName(tr.to))+')':''}</button> <button class="btn sm" onclick="Store.update({'trades/${id}/status':'rejected'})">Reject</button> `;
+      if (tr.from===ME) act += `<button class="btn sm" onclick="Store.update({'trades/${id}/status':'cancelled'})">Cancel</button> `;
+    }
+    if (tr.status==='accepted' && isCommish()) act += `<button class="btn sm danger" onclick="vetoTrade('${id}')">Commish veto</button>`;
+    h += `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(tName(tr.from))}</b> sends ${names(tr.give)} → <b>${esc(tName(tr.to))}</b> sends ${names(tr.get)}</div><span class="tag">${tr.status.toUpperCase()}</span></div><div class="row" style="margin-top:6px">${act}</div></div>`;
+  }
+  return h;
+}
+function proposeTrade(to){
+  if (!ui.tradeGive.size && !ui.tradeGet.size) return toast('Pick at least one player.');
+  const id = uid(), o = s => Object.fromEntries([...s].map(p=>[p,true]));
+  Store.update(logUpdate({['trades/'+id]:{from:ME,to,give:o(ui.tradeGive),get:o(ui.tradeGet),status:'pending',ts:Date.now()}}, `${tName(ME)} sent a trade offer to ${tName(to)}`));
+  ui.tradeGive.clear(); ui.tradeGet.clear();
+}
+function vetoTrade(id){
+  const tr = S.trades[id], u = {['trades/'+id+'/status']:'vetoed'};
+  Object.keys(tr.give||{}).forEach(p=>{ if(ownerOf(p)===tr.to){ u['rosters/'+tr.to+'/'+p]=null; u['rosters/'+tr.from+'/'+p]=S.rosters[tr.to][p]; } });
+  Object.keys(tr.get||{}).forEach(p=>{ if(ownerOf(p)===tr.from){ u['rosters/'+tr.from+'/'+p]=null; u['rosters/'+tr.to+'/'+p]=S.rosters[tr.from][p]; } });
+  Store.update(logUpdate(u,'Commissioner vetoed a trade — players returned'));
+}
+
+/* Standings */
+function vStandings(){
+  if (S.draft.status!=='done') return `<h2>Standings</h2><div class="banner">Standings start after the draft.</div>`;
+  const st = standings();
+  return `<h2>Standings</h2><div class="card tw"><table><tr><th>#</th><th>Team</th><th>W-L-T</th><th class="num">PF</th><th class="num">PA</th></tr>${st.map((r,i)=>`<tr${r.t===ME?' style="background:rgba(255,122,26,.08)"':''}><td>${i+1}</td><td><b>${esc(tName(r.t))}</b></td><td>${r.w}-${r.l}-${r.tie}</td><td class="num">${fmt(r.pf)}</td><td class="num">${fmt(r.pa)}</td></tr>`).join('')}</table></div>
+  <p class="muted small">Counts completed weeks only. Top 6 make the playoffs (playoff bracket coming in a later version).</p>`;
+}
+
+/* League */
+function vLeague(){
+  const s = S.settings, cm = isCommish();
+  const logs = Object.values(S.log).sort((a,b)=>b.ts-a.ts).slice(0,60);
+  return `<h2>League</h2>
+  <div class="grid2">
+  <div class="card"><h3>Your team</h3><div class="row"><input id="tn" value="${esc(tName(ME))}"><button class="btn" onclick="Store.update({['teams/'+ME+'/name']:$('#tn').value||tName(ME)})">Rename</button></div>
+    <h3>Scoring (H2H points)</h3><table>${Object.keys(STAT_LABELS).map(k=>`<tr><td>${STAT_LABELS[k]}</td><td class="num"><b>${s.scoring[k]>0?'+':''}${s.scoring[k]}</b></td></tr>`).join('')}</table>
+    <p class="muted small">Rule: each starter's best <b>${s.gameCap}</b> games per week count. Triple-doubles earn both bonuses (+${s.scoring.DD+s.scoring.TD}). Lineup: ${s.slots.join(', ')} + ${s.rosterSize-s.slots.length} bench.</p></div>
+  <div class="card"><h3>Commissioner</h3>
+    <label class="row"><input type="checkbox" ${cm?'checked':''} onchange="lsSet('b3h_commish',this.checked?'1':'0');render()"> Commissioner mode (this browser)</label>
+    ${cm?`<p class="small muted">Stats source</p><div class="row"><select onchange="Store.update({'settings/statsMode':this.value})"><option value="sim" ${isSim()?'selected':''}>Simulated (demo / preseason)</option><option value="live" ${!isSim()?'selected':''}>Live ESPN box scores</option></select></div>
+      ${isSim()?`<p class="small muted">Sim clock: <b>${esc(simStatus())}</b> — move it in the <a href="#" onclick="go('sim');return false">Sim Lab</a>.</p>`:''}
+      <h3>Team names</h3>${teamIds().map(t=>`<div class="row" style="margin:3px 0"><input value="${esc(tName(t))}" onchange="Store.update({['teams/${t}/name']:this.value})"></div>`).join('')}
+      <h3>Danger zone</h3><button class="btn danger" onclick="resetLeague()">Delete league & start over</button>`:'<p class="muted small">Turn this on to start the draft, run auto-draft, veto trades and edit any lineup.</p>'}
+    <p class="small muted" style="margin-top:12px">Storage: ${STORE_MODE==='firebase'?'Firebase (shared with everyone)':'Demo — saved only in this browser. Add a Firebase config at the top of the file to go multiplayer.'}<br>Player pool: ${esc(POOL_SRC)}</p></div>
+  </div>
+  <h3>Transactions</h3><div class="card tw"><table>${logs.map(l=>`<tr><td class="muted small">${new Date(l.ts).toLocaleString()}</td><td>${esc(l.text)}</td></tr>`).join('')||'<tr><td class="muted">Nothing yet</td></tr>'}</table></div>`;
+}
+function resetLeague(){ openModal(`<h3>Delete the whole league?</h3><p class="muted">Rosters, draft, trades — all gone.</p><div class="row"><button class="btn danger" onclick="closeModal();Store.replace(null)">Delete</button><button class="btn" onclick="closeModal()">Cancel</button></div>`); }
+
+
+/* =================== MOCK DRAFT (practice only — never touches the real league) =================== */
+let MOCK = null; try{ MOCK = JSON.parse(lsGet('b3h_mock')||'null'); }catch(e){}
+let mockTimer = null;
+const mockSave = () => lsSet('b3h_mock', JSON.stringify(MOCK));
+const mockTeamAt = n => { const N=MOCK.N, r=Math.floor(n/N), k=n%N; return r%2===0 ? k : N-1-k; };
+const mockTotal = () => MOCK.N*MOCK.rounds;
+const mockMine = () => MOCK.slot-1;
+const mockTeamName = i => i===mockMine() ? 'You' : 'CPU '+(i+1);
+function mockAvail(){ const taken=new Set(MOCK.picks); return Object.values(POOL).filter(p=>!taken.has(p.id)).sort((a,b)=>a.rank-b.rank); }
+function mockRoster(i){ return MOCK.picks.filter((p,n)=>mockTeamAt(n)===i); }
+function cpuChoose(i){
+  const av = mockAvail().slice(0,8), mine = mockRoster(i).map(p=>pInfo(p).pos);
+  const has = pos => mine.filter(x=>x===pos||(ELIG[x]&&ELIG[x].includes(pos))).length;
+  // weighted pick near the top of the board, nudged toward positions the CPU still needs
+  const w = av.map((p,k)=>{ let x = [40,22,14,9,6,4,3,2][k]; if (MOCK.picks.length/MOCK.N > 5){ if(/C/.test(p.pos)&&!has('C')) x*=2.2; if(/G/.test(p.pos)&&has('PG')+has('SG')+has('G')<2) x*=1.6; } return x; });
+  let r = Math.random()*w.reduce((a,b)=>a+b,0); for (let k=0;k<av.length;k++){ r-=w[k]; if(r<=0) return av[k].id; } return av[0].id;
+}
+function mockTick(){
+  clearTimeout(mockTimer);
+  if (!MOCK || MOCK.picks.length>=mockTotal()) return;
+  const n = MOCK.picks.length, team = mockTeamAt(n);
+  if (team===mockMine() && !MOCK.autoMe) return;
+  mockTimer = setTimeout(()=>{ MOCK.picks.push(cpuChoose(team)); mockSave(); if(ui.tab==='mock') render(); mockTick(); }, MOCK.fast||MOCK.autoMe ? 25 : 450);
+}
+function mockStart(){
+  const N = +$('#mN').value, sl = $('#mS').value, rounds = +$('#mR').value;
+  MOCK = {N, rounds, slot: sl==='rand' ? 1+Math.floor(Math.random()*N) : Math.min(+sl,N), picks:[], fast: $('#mF').checked, autoMe:false, started:Date.now()};
+  mockSave(); render(); mockTick();
+}
+function mockPick(pid){ if(!MOCK || mockTeamAt(MOCK.picks.length)!==mockMine() || MOCK.picks.includes(pid)) return; MOCK.picks.push(pid); mockSave(); render(); mockTick(); }
+function mockSimToEnd(){ MOCK.autoMe = true; MOCK.fast = true; mockSave(); mockTick(); }
+function mockQuit(){ clearTimeout(mockTimer); MOCK = null; lsSet('b3h_mock','null'); render(); }
+function mockProj(i){ // projected weekly points: top 10 by projected avg × 3 games
+  return mockRoster(i).map(p=>projAvg(pInfo(p))).sort((a,b)=>b-a).slice(0,10).reduce((a,b)=>a+b*3,0);
+}
+function vMock(){
+  const N0 = S ? S.settings.numTeams : 10, R0 = S ? S.settings.rosterSize : 13;
+  if (!MOCK) return `<h2>Mock Draft</h2><div class="card"><p class="muted">Practice draft against computer teams. Nothing here touches your real league.</p>
+    <div class="row"><label>Teams <select id="mN">${[4,6,8,10,12,14].map(n=>`<option ${n===N0?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label>Your pick <select id="mS"><option value="rand">Random</option>${Array.from({length:14},(_,i)=>`<option value="${i+1}">#${i+1}</option>`).join('')}</select></label>
+    <label>Rounds <select id="mR">${[5,8,10,13,15].map(n=>`<option ${n===R0?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label class="small"><input type="checkbox" id="mF"> Fast CPU picks</label>
+    <button class="btn pri" onclick="mockStart()">Start mock draft</button></div></div>`;
+  const n = MOCK.picks.length, total = mockTotal(), done = n>=total, team = done?null:mockTeamAt(n), myTurn = team===mockMine();
+  let h = `<div class="row" style="justify-content:space-between"><h2>Mock Draft</h2><div class="row">
+    ${done?'':`<button class="btn" ${myTurn?'':'disabled'} onclick="mockPick(mockAvail()[0].id)">Auto-pick for me</button><button class="btn" onclick="mockSimToEnd()">Sim to the end</button>`}
+    <button class="btn" onclick="mockQuit();render()">New mock</button></div></div>`;
+  if (!done) h += `<div class="banner">${myTurn?`YOU'RE ON THE CLOCK — Round ${Math.floor(n/MOCK.N)+1}, pick ${n%MOCK.N+1} (overall #${n+1})`:`${mockTeamName(team)} is picking… <span class="muted small">(your pick: #${MOCK.slot})</span>`}</div>`;
+  else {
+    const proj = Array.from({length:MOCK.N},(_,i)=>({i,p:mockProj(i)})).sort((a,b)=>b.p-a.p), place = proj.findIndex(x=>x.i===mockMine())+1;
+    h += `<div class="banner">Mock complete — your team projects <b>#${place} of ${MOCK.N}</b> (~${Math.round(mockProj(mockMine()))} pts/week if every starter plays 3 games).</div>
+      <div class="card"><h3>Your team</h3><div class="row">${mockRoster(mockMine()).map(p=>`<span class="tag"><span class="pos">${esc(pInfo(p).pos)}</span> ${esc(pInfo(p).name)}</span>`).join('')}</div>
+      <div class="row" style="margin-top:12px"><button class="btn pri" onclick="mockToLeague()">Turn this mock into a test league</button><span class="muted small">Creates a ${STORE_MODE==='firebase'?'league for EVERYONE (replaces the current one!)':'test league in this browser'} with these rosters, simulated stats, and you as "You".</span></div></div>`;
+  }
+  const N = MOCK.N; let b = `<div class="tw"><div class="board" style="grid-template-columns:repeat(${N},minmax(84px,1fr))">` + Array.from({length:N},(_,i)=>`<div class="hd">${mockTeamName(i)}</div>`).join('');
+  for (let r=0;r<MOCK.rounds;r++) for (let c=0;c<N;c++){ const k = r%2===0? r*N+c : r*N+(N-1-c), pid = MOCK.picks[k];
+    b += `<div class="${c===mockMine()?'me':''}">${pid?`<b>${esc(pInfo(pid).name)}</b><br><span class="muted">${esc(pInfo(pid).pos)} · ${r+1}.${k%N+1}</span>`:`<span class="muted">${r+1}.${k%N+1}</span>`}</div>`; }
+  b += `</div></div>`;
+  h += done ? `<div class="card">${b}</div>` : `<div class="grid2"><div><div class="row" style="margin-bottom:10px"><input id="mq" placeholder="Search players" value="${esc(ui.mq||'')}" oninput="ui.mq=this.value;renderMockList()">
+    <select onchange="ui.mpos=this.value;renderMockList()">${['ALL','PG','SG','SF','PF','C','G','F'].map(p=>`<option ${p===(ui.mpos||'ALL')?'selected':''}>${p}</option>`).join('')}</select></div><div id="mlist" class="card tw"></div>
+    <div class="card"><h3>Your picks</h3>${mockRoster(mockMine()).map(p=>`<div>${esc(pInfo(p).name)} <span class="muted small">${esc(pInfo(p).pos)}</span></div>`).join('')||'<span class="muted">None yet</span>'}</div></div><div class="card">${b}</div></div>`;
+  return h;
+}
+function renderMockList(){
+  const el = $('#mlist'); if (!el || !MOCK) return;
+  const q = norm(ui.mq), pos = ui.mpos||'ALL', myTurn = MOCK.picks.length<mockTotal() && mockTeamAt(MOCK.picks.length)===mockMine();
+  const list = mockAvail().filter(p=>(!q||norm(p.name).includes(q))&&(pos==='ALL'||eligible(pos,p.pos))).slice(0,60);
+  el.innerHTML = `<table><tr><th>Rk</th><th>Player</th><th>Pos</th><th>NBA</th><th></th></tr>${list.map(p=>`<tr><td class="muted">${p.rank>RANKS.length?'—':p.rank}</td><td>${esc(p.name)}</td><td><span class="pos">${esc(p.pos)}</span></td><td>${esc(p.team)}</td><td class="num"><button class="btn sm pri" ${myTurn?'':'disabled'} onclick="mockPick('${p.id}')">Draft</button></td></tr>`).join('')}</table>`;
+}
+function mockToLeague(){
+  if (STORE_MODE==='firebase' && !isCommish()) return toast('Only the commissioner can replace the online league.');
+  if (S && !confirm('Replace the current league with this mock? (The old league is deleted.)')) return;
+  const teams = {}, rosters = {}, picks = {}, order = [];
+  for (let i=0;i<MOCK.N;i++){ teams['t'+i] = {name: mockTeamName(i)}; rosters['t'+i] = {}; order.push('t'+i); }
+  MOCK.picks.forEach((pid,n)=>{ const t='t'+mockTeamAt(n); rosters[t][pid] = snap(pInfo(pid)); picks[n] = {team:t, pid, ts:Date.now()}; });
+  ME = 't'+mockMine(); lsSet('b3h_me', ME);
+  Store.replace({settings:{...DEFAULT_SETTINGS, name:'Test League (from mock)', numTeams:MOCK.N, rosterSize:MOCK.rounds}, teams, rosters, lineups:{}, trades:{}, log:{x:{ts:Date.now(),text:'Test league created from a mock draft'}}, draft:{status:'done', order, picks}, created:Date.now()});
+  go('matchup');
+}
+
+/* =================== SIM LAB =================== */
+const canSim = () => STORE_MODE!=='firebase' || isCommish();
+function vSim(){
+  const s = S.settings, dis = canSim()?'':'disabled';
+  let h = `<h2>Sim Lab</h2><p class="muted">Test everything before the season starts. Simulated stats are fake but realistic — each NBA team plays 3 or 4 games a week, so the best-3 rule kicks in.</p>`;
+  if (!isSim()) h += `<div class="banner">The league is on LIVE ESPN stats. ${isCommish()?`<button class="btn sm" onclick="Store.update({'settings/statsMode':'sim'})">Switch to simulated stats</button>`:'The commissioner can switch to simulated stats in the League tab.'}</div>`;
+  else h += `<div class="card"><h3>Season clock</h3><p>Now: <b>${esc(simStatus())}</b></p>
+    <div class="row"><button class="btn pri" ${dis} onclick="simAdvanceDay()">+1 day</button><button class="btn" ${dis} onclick="simFinishWeek()">Finish this week</button>
+    <button class="btn" ${dis} onclick="simSet(${s.regWeeks},0)">Sim whole regular season</button><button class="btn" ${dis} onclick="simSet(0,0)">Back to preseason</button>
+    <button class="btn" ${dis} onclick="Store.update({'settings/simSeed':(S.settings.simSeed||1)+1})">Re-roll all stats</button></div>
+    <div class="row" style="margin-top:8px"><span class="small muted">Jump to start of</span><select ${dis} onchange="simSet(+this.value-1,0)">${Array.from({length:s.regWeeks},(_,i)=>`<option value="${i+1}" ${i+1===s.simWeek+1?'selected':''}>${esc(weekLabel(i+1))}</option>`).join('')}</select>
+    ${canSim()?'':'<span class="small muted">Commissioner only in online mode.</span>'}</div>
+    <p class="muted small">Tip: go day by day and watch the Scoreboard — once a player's 4th game happens, his lowest game turns red.</p></div>`;
+  if (S.draft.status!=='done') h += `<div class="card"><h3>Quick test league</h3><p class="muted">Your draft isn't done. This auto-drafts every team by ranking and jumps the sim to mid-Week 3 so you can see scores right away.</p><button class="btn pri" ${dis} onclick="quickTest()">Auto-draft everyone & start testing</button></div>`;
+  else if (isSim()) {
+    const w = curWeek(), hits = [];
+    for (const t of teamIds()) for (const r of teamWeek(t,w).rows) if (r.games.length > s.gameCap) hits.push({t, r, lost: r.games.filter(g=>!g.counted).reduce((a,g)=>a+g.fp,0)});
+    hits.sort((a,b)=>b.lost-a.lost);
+    h += `<div class="card"><h3>Where the 3-game cap kicked in — ${esc(weekLabel(w))}</h3>${hits.length?`<div class="tw"><table><tr><th>Team</th><th>Player</th><th>Games</th><th class="num">Dropped pts</th></tr>${hits.slice(0,15).map(x=>`<tr><td>${esc(tName(x.t))}</td><td>${esc(pInfo(x.r.pid).name)}</td><td>${x.r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}">${fmt(g.fp)}</span>`).join('')}</td><td class="num">${fmt(x.lost)}</td></tr>`).join('')}</table></div>`:'<p class="muted">No starter has played a 4th game yet this week — hit "+1 day" a few times.</p>'}</div>`;
+  }
+  h += `<div class="card"><h3>Best-3 calculator</h3><p class="muted small">Type in (or randomize) a player's games for one week and see exactly what counts with your scoring.</p>
+    <div class="row" style="margin-bottom:8px"><label>Games this week <select onchange="calcResize(+this.value)">${[1,2,3,4,5].map(n=>`<option ${n===ui.calc.length?'selected':''}>${n}</option>`).join('')}</select></label><button class="btn" onclick="calcRandom()">Randomize</button></div>
+    <div class="tw"><table><tr><th>Game</th>${CALC_K.map(k=>`<th>${k}</th>`).join('')}<th class="num">FP</th><th></th></tr>${ui.calc.map((g,i)=>`<tr><td>#${i+1}</td>${CALC_K.map(k=>`<td><input type="number" style="width:58px" value="${g[k]}" oninput="ui.calc[${i}].${k}=+this.value||0;renderCalc()"></td>`).join('')}<td class="num" id="cfp${i}"></td><td id="cst${i}"></td></tr>`).join('')}</table></div>
+    <p id="cout" style="margin:10px 0 0"></p></div>`;
+  return h;
+}
+const CALC_K = ['PTS','FGM','REB','AST','STL','BLK','TO'];
+function calcLine(){ const r=Math.random, f=.6+r()*.9, P=Math.round(24*f*(.7+r()*.6)); return {PTS:P, FGM:Math.round(P*.38), REB:Math.round(8*f*(.6+r()*.8)), AST:Math.round(6*f*(.6+r()*.8)), STL:Math.round(r()*2.5), BLK:Math.round(r()*2), TO:Math.round(r()*4)}; }
+ui.calc = Array.from({length:4}, calcLine);
+function calcResize(n){ while(ui.calc.length<n) ui.calc.push(calcLine()); ui.calc.length=n; render(); }
+function calcRandom(){ ui.calc = ui.calc.map(calcLine); render(); }
+function renderCalc(){
+  if (!$('#cout')) return;
+  const fp = ui.calc.map(fpts), cap = S.settings.gameCap, best = fp.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]).slice(0,cap).map(x=>x[1]);
+  fp.forEach((v,i)=>{ $('#cfp'+i).innerHTML = `<b>${fmt(v)}</b>`; $('#cst'+i).innerHTML = best.includes(i)?'<span class="chip c">counts</span>':'<span class="chip x">dropped</span>'; });
+  const counted = best.reduce((a,i)=>a+fp[i],0), all = fp.reduce((a,b)=>a+b,0);
+  $('#cout').innerHTML = `Counted: <b>${best.sort((a,b)=>a-b).map(i=>fmt(fp[i])).join(' + ')} = ${fmt(counted)}</b>` + (fp.length>cap?` · Without the cap he'd score ${fmt(all)} — <span style="color:var(--bad)">${fmt(all-counted)} dropped</span>.`:` · Under ${cap+1} games, so nothing is dropped.`);
+}
+function quickTest(){ if (S.draft.status==='pre') S.draft.order = S.draft.order; simRestOfDraft(); Store.update({'draft/status':'done','settings/statsMode':'sim','settings/simWeek':2,'settings/simDay':3}); go('matchup'); }
+
+$('#meSel').addEventListener('change', e=>{ ME=e.target.value; lsSet('b3h_me',ME); ui.tradeGive.clear(); ui.tradeGet.clear(); ui.teamView=null; render(); });
+
+(async()=>{ await loadPool(); await Store.init(); if (MOCK) mockTick(); })();
+</script>
+</body>
+</html>
