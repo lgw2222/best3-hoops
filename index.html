@@ -155,6 +155,13 @@ a{color:var(--blue)}
 .spark i:last-child{opacity:1}
 .spark.up i:last-child{background:var(--good)}.spark.down i:last-child{background:var(--bad)}
 /* hero stat tiles */
+.seg{display:inline-flex;padding:4px;gap:4px;border-radius:13px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.seg button{border:0;background:none;color:var(--mute);font:700 12.5px Inter,sans-serif;padding:7px 14px;border-radius:9px;cursor:pointer;transition:all .25s var(--ease)}
+.seg button.on{background:var(--grad);color:#fff;box-shadow:0 6px 16px -8px rgba(255,61,119,.8)}
+th.dcol,td.dcol{text-align:center;padding-left:6px;padding-right:6px}
+th.dcol.cur,td.dcol.cur{background:rgba(255,122,26,.08)}
+.opp{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:8px;color:var(--mute);border:1px dashed var(--line2)}
+.opp.st{color:#fff;border:1px solid rgba(90,169,255,.5);background:rgba(59,142,234,.18)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
 .tile{padding:14px 16px;border-radius:14px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(14px)}
 .tile .k{font-size:10.5px;font-weight:800;letter-spacing:1.2px;color:var(--mute);text-transform:uppercase}
@@ -1188,21 +1195,75 @@ function vTeam(){
       <button class="btn pri" onclick="autoSet('${t}',${w},$('#amode').value)">Auto-set rest of Week ${w}</button>
       <label class="small"><input type="checkbox" ${S.teams[t].autopilot?'checked':''} onchange="Store.update({['teams/${t}/autopilot']:this.checked?$('#amode').value:null})"> Autopilot (auto-set every day I don't set myself)</label>
     </div><p id="adesc" class="muted small" style="margin:6px 0 0">${AUTO_MODES[lsGet('b3h_automode')||'proj'].desc}${S.teams[t].autopilot?` <b>Autopilot is on (${AUTO_MODES[S.teams[t].autopilot].label}).</b>`:''}</p></div>`:''}
-    <div class="card tw"><table><tr><th>Slot</th><th>Player — ${dayName(d)}</th><th>Today</th><th>Started games this week</th><th class="num">Week pts</th></tr>`;
+    ${weekNote(w,d)}
+    <div class="row" style="margin:4px 0 10px;justify-content:space-between">
+      <div class="seg">${[['schedule','📅 Schedule'],['stats','📊 Stats'],['both','Both']].map(([k,l])=>`<button class="${tmode()===k?'on':''}" onclick="lsSet('b3h_tmode','${k}');render()">${l}</button>`).join('')}</div>
+      ${tmode()!=='schedule'?`<select title="Stat window" onchange="lsSet('b3h_tstat',this.value);render()">${Object.entries(STAT_VIEWS).map(([k,v])=>`<option value="${k}" ${k===tstat()?'selected':''}>${v}</option>`).join('')}</select>`:''}
+    </div>
+    ${tmode()!=='stats'?`<p class="muted small" style="margin:-4px 0 10px">Each day shows the opponent (blue = in your lineup that day, dashed = on your bench). Played days show fantasy points: <span class="chip c">green</span> counted toward his best ${cap}, <span class="chip x">red</span> outside his best ${cap}, faded = scored on your bench.</p>`:''}
+    <div class="card tw"><table><tr><th>Slot</th><th>Player — ${dayName(d)}</th><th>Today</th>${xhead(ds,d)}<th>Started games this week</th><th class="num">Week pts</th></tr>`;
   const todayCell = pid => { if(!plays(pid,d)) return '<span class="muted small">no game</span>'; const g=gameOn(pid,d); if(g) return `<span class="chip ${ (rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span>`; const n=usedBefore(pid); return `<b>${esc(oppOn(pid,d)||'plays')}</b>${!isSim()&&fullGame(pInfo(pid).team,d)?` <span class="muted small">${new Date(fullGame(pInfo(pid).team,d).tip).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>`:''}${n>=cap?` <span class="small" style="color:var(--acc2)">(already ${n} games — only counts if it beats his worst)</span>`:''}`; };
   S.settings.slots.forEach((slot,i)=>{
     const pid = lu[i], p = pid?pInfo(pid):null, r = pid&&rowOf(pid);
     const cell = edit && !slotLocked(pid) ? (pid?`<a class="pl small" title="Player card" onclick="openPlayer('${pid}')">ⓘ</a> `:'')+`<select onchange="setSlot('${t}','${d}',${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos) && (x===pid || !slotLocked(x))).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ●':''}</option>`).join('')}</select>`
       : (p?`${slotLocked(pid)?'🔒 ':''}${pLink(pid)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>`:'<span class="muted">Empty</span>');
-    h += `<tr><td><span class="pos">${slot}</span></td><td>${cell}</td><td>${p?todayCell(pid):''}</td>
+    h += `<tr><td><span class="pos">${slot}</span></td><td>${cell}</td><td>${p?todayCell(pid):''}</td>${xcols(t,pid,ds,d,r)}
       <td>${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" title="${dayName(g.date)}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num"><b>${r?fmt(r.pts):''}</b></td></tr>`;
   });
   const benchPts = T.rows.filter(r=>!lu.includes(r.pid));
-  h += `<tr><td></td><td><b>Week total</b></td><td></td><td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>
+  h += `<tr><td></td><td><b>Week total</b></td><td></td>${xfoot(t,ds,d,lu)}<td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>
     ${benchPts.length?`<p class="muted small">Also counting this week (started on other days): ${benchPts.map(r=>`${pLink(r.pid)} ${fmt(r.pts)}`).join(' · ')}</p>`:''}
-    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th><th>Today</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td><td>${plays(p,d)?`<b>${esc(oppOn(p,d)||'plays')}</b> <span class="muted small">(won't count on bench)</span>`:'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
+    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th>${xhead(ds,d)}<th>Today</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td>${xcols(t,p,ds,d,T.rows.find(r=>r.pid===p))}<td>${plays(p,d)?`<b>${esc(oppOn(p,d)||'plays')}</b> <span class="muted small">(won't count on bench)</span>`:'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
     ${S.settings.irSlots?`<h3>Injured reserve (${irIds(t).length}/${S.settings.irSlots})</h3><div class="card tw"><table>${irIds(t).map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)} <span class="muted small">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span></td><td class="num">${canEdit(t)?`<button class="btn sm" onclick="activateIR('${t}','${p}')">Activate</button> <button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted small">Empty. Players listed as OUT can be moved here from the bench to free a roster spot (games on IR never count).</td></tr>'}</table></div>`:''}`;
   return h;
+}
+/* My Team view mode: schedule grid, stats, or both (remembered per browser) */
+const tmode = () => lsGet('b3h_tmode') || 'both';
+const tstat = () => lsGet('b3h_tstat') || 'season';
+const shortOpp = (pid,d) => (oppOn(pid,d)||'').replace(/^vs /,'').replace(/^@ /,'@').replace(/ ·.*/,'');
+function xhead(ds,d){
+  let h = '';
+  if (tmode()!=='stats') h += ds.map(x=>`<th class="dcol${x===d?' cur':''}">${dayName(x)}<br><span style="font-weight:600;letter-spacing:0">${+x.slice(4,6)}/${+x.slice(6)}</span></th>`).join('') + '<th class="num" title="NBA games this week">Gms</th>';
+  if (tmode()!=='schedule') h += `<th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num" title="${esc(STAT_VIEWS[tstat()])}">FP/G</th>`;
+  return h;
+}
+/* one row: each day shows the opponent; after it's played it shows his fantasy points
+   (green = counted, red = outside best 3, faded = he was on your bench) */
+function xcols(t,pid,ds,d,r){
+  if (!pid) return xhead(ds,d).replace(/<th[^>]*>.*?<\/th>/g,'<td></td>');
+  let h = '';
+  if (tmode()!=='stats'){
+    let n = 0;
+    h += ds.map(x=>{
+      if (!plays(pid,x)) return `<td class="dcol${x===d?' cur':''}"><span class="muted">·</span></td>`;
+      n++;
+      const started = lineupForDay(t,x).includes(pid), g = gameOn(pid,x), wk = r && r.games.find(y=>y.date===x);
+      if (g) return `<td class="dcol${x===d?' cur':''}"><span class="chip ${started?(wk&&wk.counted?'c':'x'):''}" style="${started?'':'opacity:.45'}" title="${esc(oppOn(pid,x))}${started?'':' (bench)'}">${fmt(fpts(g.line))}</span></td>`;
+      return `<td class="dcol${x===d?' cur':''}"><span class="opp${started?' st':''}" title="${started?'In your lineup':'Not in your lineup that day'}">${esc(shortOpp(pid,x))}</span></td>`;
+    }).join('');
+    h += `<td class="num"><b>${n}</b></td>`;
+  }
+  if (tmode()!=='schedule'){
+    const a = statsFor(pInfo(pid), tstat()), f = x => x==null ? '—' : fmt(x);
+    h += a ? `<td class="num">${a.GP}</td><td class="num">${f(a.MIN)}</td><td class="num">${f(a.PTS)}</td><td class="num">${f(a.REB)}</td><td class="num">${f(a.AST)}</td><td class="num">${f(a.STL)}</td><td class="num">${f(a.BLK)}</td><td class="num">${f(a.TO)}</td><td class="num"><b>${f(a.FPG)}</b></td>`
+           : `<td colspan="9" class="muted small">no games in this window</td>`;
+  }
+  return h;
+}
+/* bottom row: how many of your starters play each day */
+function xfoot(t,ds,d,lu){
+  let h = '';
+  if (tmode()!=='stats') h += ds.map(x=>{ const n = lineupForDay(t,x).filter(p=>p&&plays(p,x)).length; return `<td class="dcol${x===d?' cur':''}"><span class="small" title="starters with a game">${n}/${S.settings.slots.length}</span></td>`; }).join('') + '<td></td>';
+  if (tmode()!=='schedule') h += '<td colspan="9"></td>';
+  return h;
+}
+/* heads-up when the real NBA schedule is thin (NBA Cup break, All-Star break) */
+function weekNote(w,d){
+  if (!hasFull()) return '';
+  const n = weekDates(w).reduce((a,x)=>a+Object.keys(FULL[x]||{}).length/2,0);
+  const day = !Object.keys(FULL[d]||{}).length ? `<div class="banner">No NBA games on the schedule for ${dayName(d)} ${+d.slice(4,6)}/${+d.slice(6)} — that's why everyone shows "no game". Pick another day above, or flip to <b>Schedule</b> to see the whole week.</div>` : '';
+  if (n >= 25) return day;
+  return `<div class="banner">Light week on the real NBA schedule — only ${n} game${n===1?'':'s'} listed so far${n<12?' (NBA Cup / break week: ESPN shows the knockout games as TBD, and the NBA adds the other teams’ games later — they’ll appear here automatically)':''}.</div>` + day;
 }
 function setSlot(t,d,i,pid){
   const lu = lineupForDay(t,d).slice(), j = pid ? lu.indexOf(pid) : -1;
