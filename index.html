@@ -443,11 +443,42 @@ const tName = t => (S.teams[t]&&S.teams[t].name)||t;
 const snap = p => ({name:p.name, team:p.team, pos:p.pos, rank:p.rank});
 
 /* ---------- stats: simulated + live ESPN ---------- */
+/* FULL[date][team] = {opp:'BOS', home:true, tip:ms} — the real NBA schedule for the whole season (ESPN team schedules) */
+let FULL = {}, FULL_SRC = '';
+async function loadSchedule(){
+  const Y = nbaSeasonYear(), key = 'b3h_fullsched_'+Y;
+  try{ const c = JSON.parse(lsGet(key)||'null'); if (c && Date.now()-c.t < 24*3600e3 && Object.keys(c.f).length > 100){ FULL = c.f; FULL_SRC = 'ESPN schedule'; return; } }catch(e){}
+  try{
+    const out = {};
+    const res = await Promise.all(Array.from({length:30},(_,i)=>fetchJSON(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${i+1}/schedule?season=${Y}&seasontype=2`).catch(()=>null)));
+    for (const j of res){
+      if (!j) continue;
+      for (const ev of (j.events||[])){
+        const cs = ((ev.competitions||[])[0]||{}).competitors||[]; if (cs.length<2 || !ev.date) continue;
+        const tip = Date.parse(ev.date), d = ymd(new Date(tip));
+        for (const c of cs){ const o = cs.find(x=>x!==c), ab = c.team&&c.team.abbreviation; if (!ab||!o) continue;
+          (out[d] = out[d]||{})[ab] = {opp:o.team.abbreviation, home:c.homeAway==='home', tip}; }
+      }
+    }
+    if (Object.keys(out).length < 100) throw new Error('schedule too small');
+    FULL = out; FULL_SRC = 'ESPN schedule';
+    lsSet(key, JSON.stringify({t:Date.now(), f:out}));
+  }catch(e){ console.warn('schedule load failed', e); FULL = {}; FULL_SRC = ''; }
+}
+const TEAM_ALIAS = {NOP:'NO', NYK:'NY', UTA:'UTAH', WAS:'WSH', GSW:'GS', SAS:'SA'};
+const fullGame = (team,d) => FULL[d] && (FULL[d][team] || FULL[d][TEAM_ALIAS[team]]);
+const hasFull = () => FULL_SRC !== '';
+/* "@ DET 6:00 PM" style label */
+function oppLabel(team,d){
+  const g = fullGame(team,d); if (!g) return '';
+  return `${g.home?'vs':'@'} ${g.opp} · ${new Date(g.tip).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'})}`;
+}
 function teamGamesSim(team,w){
+  if (hasFull()) return weekDates(w).filter(d=>fullGame(team,d)).map(d=>{ const g = fullGame(team,d); return {date:d, opp:g.opp, label:(g.home?'vs ':'@ ')+g.opp}; });
   const r = rng(hash(team+'|'+w+'|'+(S.settings.simSeed||1))), dates = weekDates(w);
   const n = w===1 ? (r()<.5?2:3) : (r()<.45?3:4);
   const idx = [...dates.keys()].sort(()=>r()-.5).slice(0,n).sort((a,b)=>a-b);
-  return idx.map(i=>({date:dates[i], opp: NBA[Math.floor(r()*NBA.length)]})).filter(g=>g.opp!==team);
+  return idx.map(i=>({date:dates[i], opp: NBA[Math.floor(r()*NBA.length)]})).filter(g=>g.opp!==team).map(g=>({...g, label:'vs '+g.opp}));
 }
 function simLine(pid,info,date){
   const r = rng(hash(pid+'@'+date+'|'+(S.settings.simSeed||1)));
@@ -478,7 +509,7 @@ function giFrom(sb){ const out={}; for(const ev of (sb.events||[])){ const comp=
 function tipFrom(sb,d){ const ts=(sb.events||[]).map(e=>Date.parse(e.date)).filter(x=>x>0); if(ts.length){ TIP[d]=Math.min(...ts); lsSet('b3h_tip_'+d, String(TIP[d])); } }
 function schedFrom(sb){ const out=[]; for(const ev of (sb.events||[])) for(const c of (((ev.competitions||[])[0]||{}).competitors||[])) if(c.team) out.push(c.team.abbreviation); return out; }
 /* number of NBA games a player's team has in week w */
-function gamesThisWeek(pid,w){ const p=pInfo(pid); if(isSim()) return teamGamesSim(p.team,w).length; const ds=weekDates(w); if(!ds.some(d=>SCHED[d])) return 3.5; return ds.filter(d=>SCHED[d]&&SCHED[d].includes(p.team)).length; }
+function gamesThisWeek(pid,w){ const p=pInfo(pid); if(isSim() || hasFull()) return teamGamesSim(p.team,w).length; const ds=weekDates(w); if(!ds.some(d=>SCHED[d])) return 3.5; return ds.filter(d=>SCHED[d]&&SCHED[d].includes(p.team)).length; }
 let liveLoading = false;
 async function loadLiveWeek(w){
   if (liveLoading) return; liveLoading = true;
@@ -560,14 +591,19 @@ function dayLocked(d){
   const t=todayStr(); if (d<t) return true; if (d>t) return false;
   const tip = TIP[d] || +lsGet('b3h_tip_'+d) || 0; return tip ? Date.now()>=tip : new Date().getHours()>=18;
 }
-function teamPlays(team,d){ if(isSim()) return memo('tp|'+team+'|'+d, ()=>teamGamesSim(team,weekOfDate(d)).some(g=>g.date===d)); return !!(SCHED[d]&&SCHED[d].includes(team)); }
+function teamPlays(team,d){ if(isSim()) return memo('tp|'+team+'|'+d, ()=>teamGamesSim(team,weekOfDate(d)).some(g=>g.date===d)); if (SCHED[d]) return SCHED[d].includes(team); return !!fullGame(team,d); }
 const plays = (pid,d) => teamPlays(pInfo(pid).team, d);
-function oppOn(pid,d){ if(!isSim()) return ''; const g=teamGamesSim(pInfo(pid).team,weekOfDate(d)).find(g=>g.date===d); return g?g.opp:''; }
+/* opponent label for a player's game on day d, e.g. "@ DET" */
+function oppOn(pid,d){
+  const team = pInfo(pid).team;
+  if (!isSim()){ const gi = GI[d] && GI[d][team]; if (gi) return gi.opp; const g = fullGame(team,d); return g ? (g.home?'vs ':'@ ')+g.opp : ''; }
+  const g = teamGamesSim(team,weekOfDate(d)).find(g=>g.date===d); return g ? g.label : '';
+}
 /* ESPN-style: a player locks when HIS game tips off (or the whole day, if the league uses day locks) */
 function playerLocked(pid,d){
   if (isSim() || S.settings.lineupLock==='day') return dayLocked(d);
   const t=todayStr(); if (d<t) return true; if (d>t) return false;
-  const g = GI[d] && GI[d][pInfo(pid).team]; if (!g) return dayLocked(d);
+  const g = GI[d] && GI[d][pInfo(pid).team]; if (!g){ const f = fullGame(pInfo(pid).team,d); return f ? Date.now()>=f.tip : dayLocked(d); }
   return g.state!=='pre' || (g.tip && Date.now()>=g.tip);
 }
 /* can anything still change on day d? */
@@ -1153,7 +1189,7 @@ function vTeam(){
       <label class="small"><input type="checkbox" ${S.teams[t].autopilot?'checked':''} onchange="Store.update({['teams/${t}/autopilot']:this.checked?$('#amode').value:null})"> Autopilot (auto-set every day I don't set myself)</label>
     </div><p id="adesc" class="muted small" style="margin:6px 0 0">${AUTO_MODES[lsGet('b3h_automode')||'proj'].desc}${S.teams[t].autopilot?` <b>Autopilot is on (${AUTO_MODES[S.teams[t].autopilot].label}).</b>`:''}</p></div>`:''}
     <div class="card tw"><table><tr><th>Slot</th><th>Player — ${dayName(d)}</th><th>Today</th><th>Started games this week</th><th class="num">Week pts</th></tr>`;
-  const todayCell = pid => { if(!plays(pid,d)) return '<span class="muted small">no game</span>'; const g=gameOn(pid,d); if(g) return `<span class="chip ${ (rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span>`; const n=usedBefore(pid); return `<b>plays</b>${n>=cap?` <span class="small" style="color:var(--acc2)">(already ${n} games — only counts if it beats his worst)</span>`:''}`; };
+  const todayCell = pid => { if(!plays(pid,d)) return '<span class="muted small">no game</span>'; const g=gameOn(pid,d); if(g) return `<span class="chip ${ (rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span>`; const n=usedBefore(pid); return `<b>${esc(oppOn(pid,d)||'plays')}</b>${!isSim()&&fullGame(pInfo(pid).team,d)?` <span class="muted small">${new Date(fullGame(pInfo(pid).team,d).tip).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>`:''}${n>=cap?` <span class="small" style="color:var(--acc2)">(already ${n} games — only counts if it beats his worst)</span>`:''}`; };
   S.settings.slots.forEach((slot,i)=>{
     const pid = lu[i], p = pid?pInfo(pid):null, r = pid&&rowOf(pid);
     const cell = edit && !slotLocked(pid) ? (pid?`<a class="pl small" title="Player card" onclick="openPlayer('${pid}')">ⓘ</a> `:'')+`<select onchange="setSlot('${t}','${d}',${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos) && (x===pid || !slotLocked(x))).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ●':''}</option>`).join('')}</select>`
@@ -1164,7 +1200,7 @@ function vTeam(){
   const benchPts = T.rows.filter(r=>!lu.includes(r.pid));
   h += `<tr><td></td><td><b>Week total</b></td><td></td><td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>
     ${benchPts.length?`<p class="muted small">Also counting this week (started on other days): ${benchPts.map(r=>`${pLink(r.pid)} ${fmt(r.pts)}`).join(' · ')}</p>`:''}
-    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th><th>Today</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td><td>${plays(p,d)?'<b>plays</b> <span class="muted small">(won\'t count on bench)</span>':'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
+    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>Player</th><th>Pos</th><th>Team</th><th>Today</th><th></th></tr>${bench.map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td><td>${plays(p,d)?`<b>${esc(oppOn(p,d)||'plays')}</b> <span class="muted small">(won't count on bench)</span>`:'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
     ${S.settings.irSlots?`<h3>Injured reserve (${irIds(t).length}/${S.settings.irSlots})</h3><div class="card tw"><table>${irIds(t).map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)} <span class="muted small">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span></td><td class="num">${canEdit(t)?`<button class="btn sm" onclick="activateIR('${t}','${p}')">Activate</button> <button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted small">Empty. Players listed as OUT can be moved here from the bench to free a roster spot (games on IR never count).</td></tr>'}</table></div>`:''}`;
   return h;
 }
@@ -1564,7 +1600,7 @@ async function fetchGameLog(id, season){
 }
 function simLog(pid){
   const out = [], last = curWeek();
-  for (let w=1; w<=last; w++) for (const g of playerGames(pid,w)) out.push({date:g.date, opp:'vs '+g.opp, result:'', line:g.line});
+  for (let w=1; w<=last; w++) for (const g of playerGames(pid,w)) out.push({date:g.date, opp:g.label||('vs '+g.opp), result:'', line:g.line});
   return out.sort((a,b)=>b.date.localeCompare(a.date));
 }
 function avgRow(log){
@@ -1583,7 +1619,7 @@ function fantasyTag(pid, d){
 function upcoming(pid){
   const out = [], start = isSim() ? (()=>{ const w=curWeek(), ds=weekDates(w); return ds[Math.min(simDaysPlayed(w), ds.length-1)]; })() : todayStr();
   let d = new Date(+start.slice(0,4), +start.slice(4,6)-1, +start.slice(6));
-  for (let i=0;i<7;i++){ const k = ymd(d); if (plays(pid,k)){ const opp = isSim() ? 'vs '+oppOn(pid,k) : ((GI[k]&&GI[k][pInfo(pid).team]||{}).opp||''); out.push(`${dayName(k)} ${+k.slice(4,6)}/${+k.slice(6)} ${esc(opp)}`); } d.setDate(d.getDate()+1); }
+  for (let i=0;i<7;i++){ const k = ymd(d); if (plays(pid,k)){ const opp = oppOn(pid,k); out.push(`${dayName(k)} ${+k.slice(4,6)}/${+k.slice(6)} ${esc(opp)}`); } d.setDate(d.getDate()+1); }
   return out;
 }
 let CARD_PID = null;
@@ -1654,8 +1690,8 @@ function castDayDefault(w){
 function gameStatus(pid,d){
   const p = pInfo(pid);
   if (!plays(pid,d)) return {txt:'No game', state:'none'};
-  if (isSim()){ const opp = oppOn(pid,d); return dayLocked(d) ? {txt:`Final · vs ${opp}`, state:'post'} : {txt:`vs ${opp} · not played yet`, state:'pre'}; }
-  const g = GI[d] && GI[d][p.team]; if (!g) return {txt:'Scheduled', state:'pre'};
+  if (isSim()){ const opp = oppOn(pid,d); return dayLocked(d) ? {txt:`Final · ${opp}`, state:'post'} : {txt:`${opp} · not played yet`, state:'pre'}; }
+  const g = GI[d] && GI[d][p.team]; if (!g) return {txt: oppLabel(p.team,d) || 'Scheduled', state:'pre'};
   return {txt: `${g.opp} · ${g.status}${g.score?` · ${g.score}`:''}`, state:g.state};
 }
 function vCast(){
@@ -1740,7 +1776,7 @@ function quickTest(){ if (S.draft.status==='pre') S.draft.order = S.draft.order;
 
 $('#meSel').addEventListener('change', e=>{ ME=e.target.value; lsSet('b3h_me',ME); ui.tradeGive.clear(); ui.tradeGet.clear(); ui.teamView=null; render(); });
 
-(async()=>{ await loadPool(); await Store.init(); if (DEMO && MOCK && lsGet('b3h_pending_mock')==='1' && MOCK.picks.length>=mockTotal()) mockToLeague(); if (MOCK) mockTick(); })();
+(async()=>{ await Promise.all([loadPool(), loadSchedule()]); await Store.init(); if (DEMO && MOCK && lsGet('b3h_pending_mock')==='1' && MOCK.picks.length>=mockTotal()) mockToLeague(); if (MOCK) mockTick(); })();
 </script>
 </body>
 </html>

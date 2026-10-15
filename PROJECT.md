@@ -4,7 +4,7 @@ Fantasy basketball site where **each starter's best 3 games per week count** (th
 
 - **Live URL (after upload):** https://lgw2222.github.io/best3-hoops/
 - **Sandbox (private test league, this device only):** https://lgw2222.github.io/best3-hoops/?demo=1
-- **Version:** v1.0 (2026-10-15)
+- **Version:** v1.1 (2026-10-15) — real NBA schedule preloaded
 
 ## Files
 | File | What it is |
@@ -20,6 +20,7 @@ Fantasy basketball site where **each starter's best 3 games per week count** (th
   - Player list: `lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/{2027}/players?view=kona_player_info` + `X-Fantasy-Filter` (ranks, ADP, % rostered + weekly change, positions, injuries, projections, last season, last 7/15/30, outlooks)
   - Rosters: `site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{1-30}/roster`
   - Scores / box scores: `.../nba/scoreboard?dates=YYYYMMDD`, `.../nba/summary?event=ID`
+  - Full season schedule: `site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{1-30}/schedule?season=2027&seasontype=2` (used for test weeks, games-this-week, opponents, tip times; cached 24 h)
   - Game logs: `site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{id}/gamelog?season=YYYY`
   - Headshots: `a.espncdn.com/i/headshots/nba/players/full/{id}.png`
   - Blocked from GitHub Pages: `.../nba/teams` (team list) — don't use it.
