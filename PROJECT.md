@@ -4,7 +4,7 @@ Fantasy basketball site where **each starter's best 3 games per week count** (th
 
 - **Live URL (after upload):** https://lgw2222.github.io/best3-hoops/
 - **Sandbox (private test league, this device only):** https://lgw2222.github.io/best3-hoops/?demo=1
-- **Version:** v1.2 (2026-10-15) — My Team Schedule / Stats / Both toggle (Mon–Sun opponent grid, last 7/15/30 stat windows), no-game-day banner. v1.1: real NBA schedule preloaded
+- **Version:** v1.3 (2026-10-15) — team start limit per week (settings.teamStarts, 0 = off; a game uses a start only if it adds to the total, maxed players swap better games in free), waivers default 2 days. v1.2: My Team Schedule / Stats / Both toggle (Mon–Sun opponent grid, last 7/15/30 stat windows), no-game-day banner. v1.1: real NBA schedule preloaded
 
 ## Files
 | File | What it is |

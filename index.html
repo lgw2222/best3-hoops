@@ -227,9 +227,9 @@ const DEFAULT_SETTINGS = {
   name: 'Bronny James', numTeams: 8, rosterSize: 15, irSlots: 4,
   slots: ['PG','SG','SF','PF','C','G','F','UTIL','UTIL','UTIL'],
   scoring: {PTS:1, FGM:1, REB:1, AST:1, STL:1, BLK:1, TO:-1, DD:5, TD:10},
-  gameCap: 3, statsMode: 'sim', simWeek: 2, simDay: 3, simSeed: 1,
+  gameCap: 3, teamStarts: 0, statsMode: 'sim', simWeek: 2, simDay: 3, simSeed: 1,
   lineupLock: 'game',                       // 'game' = each player locks at his tip-off (ESPN), 'day' = whole day locks at first tip
-  acqSystem: 'waivers', waiverDays: 1, addsPerWeek: 7,
+  acqSystem: 'waivers', waiverDays: 2, addsPerWeek: 7,
   tradeReviewDays: 2, vetoVotes: 4, tradeDeadline: '',
   regWeeks: 19, playoffTeams: 4, playoffRoundWeeks: 2, champRoundWeeks: 2, consolation: true,
   draftType: 'snake', pickSeconds: 30,
@@ -637,16 +637,41 @@ function teamWeek(t,w){
         const g = gameOn(pid,d); if (g) r.games.push({...g, date:d, fp:fpts(g.line)});
       });
     }
-    let total = 0;
+    let total = 0, used = 0;
+    const limit = +S.settings.teamStarts || 0;
+    if (!limit){
+      // no team limit: each player's best N started games count
+      for (const r of P.values()){
+        const best = r.games.map((g,j)=>[g.fp,j]).sort((a,b)=>b[0]-a[0]).slice(0,cap).map(x=>x[1]);
+        r.games.forEach((g,j)=>g.counted = best.includes(j));
+        used += r.games.filter(g=>g.counted).length;
+      }
+    } else {
+      /* Team start limit (in game order through the week):
+         - a player with fewer than N counted games: his game uses one team start, if any are left
+         - a player already at N (maxed): a better game swaps in for his worst one for free (no start used)
+         - once the team's starts are used up, new games can't add — only maxed players can still swap */
+      const ev = [];
+      for (const r of P.values()) r.games.forEach(g=>{ g.counted = false; g.overLimit = false;
+        const f = fullGame(pInfo(r.pid).team, g.date); ev.push({r, g, k: g.date + String((f&&f.tip)||0).padStart(15,'0')}); });
+      ev.sort((a,b)=> a.k<b.k?-1:a.k>b.k?1:0);
+      for (const {r,g} of ev){
+        const have = r.games.filter(x=>x.counted);
+        if (have.length < cap){
+          if (used < limit){ g.counted = true; used++; } else g.overLimit = true;
+        } else {
+          const worst = have.reduce((a,b)=>b.fp<a.fp?b:a);
+          if (g.fp > worst.fp){ worst.counted = false; g.counted = true; }
+        }
+      }
+    }
     const rows = [...P.values()].map(r=>{
-      const best = r.games.map((g,j)=>[g.fp,j]).sort((a,b)=>b[0]-a[0]).slice(0,cap).map(x=>x[1]);
-      r.games.forEach((g,j)=>g.counted = best.includes(j));
       r.pts = r.games.filter(g=>g.counted).reduce((s,g)=>s+g.fp,0); r.slot = r.slots[0];
       total += r.pts; return r;
     });
     const order = s => { const i=S.settings.slots.indexOf(s); return i<0?99:i; };
     rows.sort((a,b)=>order(a.slot)-order(b.slot)||b.pts-a.pts);
-    return {total, rows};
+    return {total, rows, used, limit};
   });
 }
 
@@ -1197,6 +1222,7 @@ function vTeam(){
     </div><p id="adesc" class="muted small" style="margin:6px 0 0">${AUTO_MODES[lsGet('b3h_automode')||'proj'].desc}${S.teams[t].autopilot?` <b>Autopilot is on (${AUTO_MODES[S.teams[t].autopilot].label}).</b>`:''}</p></div>`:''}
     ${weekNote(w,d)}
     <div class="row" style="margin:4px 0 10px;justify-content:space-between">
+      ${T.limit?`<span class="chip ${T.used>=T.limit?'x':'c'}" title="Team starts used this week. Maxed players swapping in a better game don't use a start.">Team starts: <b>${T.used}</b> / ${T.limit}</span>`:''}
       <div class="seg">${[['schedule','📅 Schedule'],['stats','📊 Stats'],['both','Both']].map(([k,l])=>`<button class="${tmode()===k?'on':''}" onclick="lsSet('b3h_tmode','${k}');render()">${l}</button>`).join('')}</div>
       ${tmode()!=='schedule'?`<select title="Stat window" onchange="lsSet('b3h_tstat',this.value);render()">${Object.entries(STAT_VIEWS).map(([k,v])=>`<option value="${k}" ${k===tstat()?'selected':''}>${v}</option>`).join('')}</select>`:''}
     </div>
@@ -1208,7 +1234,7 @@ function vTeam(){
     const cell = edit && !slotLocked(pid) ? (pid?`<a class="pl small" title="Player card" onclick="openPlayer('${pid}')">ⓘ</a> `:'')+`<select onchange="setSlot('${t}','${d}',${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos) && (x===pid || !slotLocked(x))).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ●':''}</option>`).join('')}</select>`
       : (p?`${slotLocked(pid)?'🔒 ':''}${pLink(pid)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>`:'<span class="muted">Empty</span>');
     h += `<tr><td><span class="pos">${slot}</span></td><td>${cell}</td><td>${p?todayCell(pid):''}</td>${xcols(t,pid,ds,d,r)}
-      <td>${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" title="${dayName(g.date)}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num"><b>${r?fmt(r.pts):''}</b></td></tr>`;
+      <td>${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" style="${g.overLimit?'text-decoration:line-through':''}" title="${dayName(g.date)}${g.overLimit?' — team starts were used up':g.counted?'':' — not in his best '+cap}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num"><b>${r?fmt(r.pts):''}</b></td></tr>`;
   });
   const benchPts = T.rows.filter(r=>!lu.includes(r.pid));
   h += `<tr><td></td><td><b>Week total</b></td><td></td>${xfoot(t,ds,d,lu)}<td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>
@@ -1498,6 +1524,7 @@ function vSettings(){
   </div><div>
   <div class="card"><h3 style="margin-top:0">Games-played limit</h3><table>
     ${row('Games that count per player, per week', sel('gameCap', [...range(1,7).map(n=>[n,n===3?'3 (best 3)':String(n)]), [99,'No limit']], true), "Each player's best N started games count")}
+    ${row('Team starts per week', sel('teamStarts', [[0,'No team limit'], ...range(10,70).map(n=>[n,String(n)])], true), "Stops pickup spam. A game uses a team start only if it adds to your total — a maxed player swapping in a better game is free. Once a team's starts are used up, new pickups can't add games.")}
   </table></div>
   <div class="card"><h3 style="margin-top:0">Scoring</h3><table>
     ${Object.keys(STAT_LABELS).map(k=>row(`${STAT_LABELS[k]} (${k})`, `<input type="number" step="0.5" style="width:80px" ${dis} value="${s.scoring[k]||0}" onchange="Store.update({['settings/scoring/${k}']:+this.value||null})">`)).join('')}
@@ -1535,7 +1562,7 @@ function vLeague(){
   <div class="grid2">
   <div class="card"><h3>Your team</h3><div class="row"><input id="tn" value="${esc(tName(ME))}"><button class="btn" onclick="Store.update({['teams/'+ME+'/name']:$('#tn').value||tName(ME)})">Rename</button></div>
     <h3>Scoring (H2H points)</h3><table>${Object.keys(STAT_LABELS).filter(k=>s.scoring[k]).map(k=>`<tr><td>${STAT_LABELS[k]}</td><td class="num"><b>${s.scoring[k]>0?'+':''}${s.scoring[k]}</b></td></tr>`).join('')}</table>
-    <p class="muted small">Rule: each starter's best <b>${s.gameCap>=99?'(no limit)':s.gameCap}</b> games per week count. Lineup: ${s.slots.join(', ')} + ${s.rosterSize-s.slots.length} bench + ${s.irSlots} IR. <a href="#" onclick="go('settings');return false">All settings →</a></p>
+    <p class="muted small">Rule: each starter's best <b>${s.gameCap>=99?'(no limit)':s.gameCap}</b> games per week count${+s.teamStarts?`, up to <b>${s.teamStarts}</b> team starts per week`:''}. Lineup: ${s.slots.join(', ')} + ${s.rosterSize-s.slots.length} bench + ${s.irSlots} IR. <a href="#" onclick="go('settings');return false">All settings →</a></p>
     <h3>League type · ${esc(s.season)}</h3><p><b>${esc(LEAGUE_TYPES[s.leagueType])}</b></p>
     <p class="muted small">${s.leagueType==='keeper'?`Each team keeps up to ${s.keepers} players (pick them on My Team). ${s.keeperCost==='round'?'A keeper costs the pick in the round he was drafted; free-agent pickups cost a last-round pick.':'Keepers cost your last-round picks.'}`:s.leagueType==='dynasty'?`Teams keep everyone. Each new season starts with a ${s.rookieRounds}-round rookie/free-agent draft, worst record picks first.`:'Everyone redrafts from scratch each season.'}</p>
     ${Object.keys(S.history).length?`<h3>League history</h3><table>${Object.values(S.history).sort((a,b)=>b.ts-a.ts).map(h=>`<tr><td>${esc(h.season)}</td><td>🏆 <b>${esc(h.champion)}</b></td><td class="small muted">${(h.standings||[]).slice(0,3).map(x=>`${esc(x.team)} ${x.w}-${x.l}`).join(' · ')}</td></tr>`).join('')}</table>`:''}</div>
