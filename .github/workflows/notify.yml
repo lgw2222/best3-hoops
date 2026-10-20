@@ -1,0 +1,22 @@
+# Sends Best of 3 Hoops phone notifications. Runs every 10 minutes (GitHub may run it a few minutes late).
+name: Best of 3 notifications
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+concurrency: { group: notify, cancel-in-progress: false }
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-audit --no-fund
+        working-directory: notify
+      - run: node send.mjs
+        working-directory: notify
+        env:
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
