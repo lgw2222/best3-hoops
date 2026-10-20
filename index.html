@@ -1140,13 +1140,14 @@ function openModal(html){ $('#modalBody').innerHTML = html; $('#modal').style.di
 function closeModal(){ $('#modal').style.display='none'; $('#modalBody').classList.remove('wide'); CARD_PID=null; ui.cardMore=false; }
 $('#modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
 
-const TABS = [['matchup','Scoreboard'],['cast','FantasyCast'],['team','My Team'],['players','Players'],['draft','Draft'],['mock','Mock Draft'],['sim','Sim Lab'],['trades','Trades'],['standings','Standings'],['settings','Settings'],['league','League']];
+const TABS = [['matchup','Scoreboard'],['cast','FantasyCast'],['team','My Team'],['players','Players'],['draft','Draft'],['mock','Mock Draft'],['sim','Sim Lab'],['trades','Trades'],['standings','Standings'],['cup','Tri-Cup'],['settings','Settings'],['league','League']];
 function go(t){ ui.tab=t; ui.anim=true; lsSet('b3h_tab',t); render(); window.scrollTo({top:0,behavior:'smooth'}); }
 const ICONS = {
   matchup:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>', cast:'<circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/>',
   team:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
   players:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>', draft:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>',
   mock:'<path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/>', sim:'<path d="M9 3h6M10 3v6L4 20a1 1 0 0 0 .9 1.5h14.2A1 1 0 0 0 20 20l-6-11V3"/>',
+  cup:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M12 7v2"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
   trades:'<path d="m16 3 4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16"/>', standings:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   league:'<path d="M4 22V4a2 2 0 0 1 2-2h8l6 6v14H4z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>'};
@@ -1202,7 +1203,7 @@ function render(){
   const w = ui.week||curWeek();
   if (!isSim()){ const key=w+'|'+todayStr(); if(key!==lastLiveReq){ lastLiveReq=key; loadLiveWeek(w); } }
   if (S.draft.status==='done' && Date.now()-lastProc > 30000) setTimeout(()=>processPending(false), 0);
-  const v = {settings:vSettings, matchup:vMatchup, cast:vCast, team:vTeam, players:vPlayers, draft:vDraft, mock:vMock, sim:vSim, trades:vTrades, standings:vStandings, league:vLeague}[ui.tab] || vMatchup;
+  const v = {cup:vCup, settings:vSettings, matchup:vMatchup, cast:vCast, team:vTeam, players:vPlayers, draft:vDraft, mock:vMock, sim:vSim, trades:vTrades, standings:vStandings, league:vLeague}[ui.tab] || vMatchup;
   const view = $('#view'); view.innerHTML = mirrorBanner() + v();
   if (MIRROR()) setTimeout(()=>syncMirror(false), 300);
   if (ui.anim){ view.classList.remove('enter'); void view.offsetWidth; view.classList.add('enter'); countUp(view); ui.anim = false; }
@@ -1415,7 +1416,9 @@ async function fetchSource(src, opt={}){
     const M = {}; await Promise.all(weeks.map(w=>fetchJSON(B+'/matchups/'+w).then(x=>M[w]=x).catch(()=>{})));
     const teams = R.sort((a,b)=>a.roster_id-b.roster_id).map(r=>{ const u = U.find(x=>x.user_id===r.owner_id)||{};
       const ir = new Set(r.reserve||[]);
-      return {srcId:String(r.roster_id), name:(u.metadata&&u.metadata.team_name) || u.display_name || 'Team '+r.roster_id, owner:u.display_name||'',
+      const rs = r.settings||{};
+      return {srcId:String(r.roster_id), name:(u.metadata&&u.metadata.team_name) || u.display_name || 'Team '+r.roster_id, owner:u.display_name||'', ownerId:'sl:'+(r.owner_id||r.roster_id),
+        real:{w:rs.wins||0, l:rs.losses||0, t:rs.ties||0, pf:(rs.fpts||0)+(rs.fpts_decimal||0)/100},
         players:(r.players||[]).map(id=>{ const m = mapId(id); return m && {id:m, ir:ir.has(id)}; }).filter(Boolean)}; });
     const slots = L.roster_positions.filter(x=>x!=='BN' && x!=='IR'), bench = L.roster_positions.filter(x=>x==='BN').length;
     const schedule = {};
@@ -1427,7 +1430,7 @@ async function fetchSource(src, opt={}){
   }
   // ESPN (league must be "viewable to public")
   const Y = nbaSeasonYear(), B = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/${Y}/segments/0/leagues/${src.id}`;
-  const j = await fetchJSON(B+'?view=mTeam&view=mRoster&view=mSettings&view=mMatchup');
+  const j = await fetchJSON(B+'?view=mTeam&view=mRoster&view=mSettings&view=mMatchup&view=mStandings');
   if (!j || !j.settings) throw new Error('ESPN league not readable — is "Make League Viewable to Public" on?');
   const cnt = j.settings.rosterSettings.lineupSlotCounts, slots = [];
   Object.keys(ESPN_SLOT).forEach(k=>{ for (let i=0;i<(cnt[k]||0);i++) slots.push(ESPN_SLOT[k]); });
@@ -1435,7 +1438,10 @@ async function fetchSource(src, opt={}){
   const ent = e => { const pl = e.playerPoolEntry.player, id = String(e.playerId);
     info[id] = {name:pl.fullName, team:ESPN_TEAM[pl.proTeamId]||'FA', pos:(pl.eligibleSlots||[]).filter(x=>x<=4).map(x=>ESPN_POS[x]).join('/')||'UTIL', rank:(POOL[id]&&POOL[id].rank)||999};
     return {id, ir: e.lineupSlotId===13, slot:e.lineupSlotId}; };
-  const teams = j.teams.map(t=>({srcId:String(t.id), name:t.name || ((t.location||'')+' '+(t.nickname||'')).trim(), players:(t.roster&&t.roster.entries||[]).map(ent)}));
+  const mem = Object.fromEntries((j.members||[]).map(m=>[m.id, m.displayName]));
+  const teams = j.teams.map(t=>{ const o = ((t.record||{}).overall)||{}, oid = (t.owners||[])[0]||('t'+t.id);
+    return {srcId:String(t.id), name:t.name || ((t.location||'')+' '+(t.nickname||'')).trim(), owner: mem[oid]||'', ownerId:'es:'+oid,
+      real:{w:o.wins||0, l:o.losses||0, t:o.ties||0, pf:o.pointsFor||0}, players:(t.roster&&t.roster.entries||[]).map(ent)}; });
   const ss = j.settings.scheduleSettings, regWeeks = ss.matchupPeriodCount||19, schedule = {};
   (j.schedule||[]).forEach(m=>{ if (m.matchupPeriodId<=regWeeks && m.home && m.away) (schedule[m.matchupPeriodId] = schedule[m.matchupPeriodId]||[]).push([String(m.home.teamId), String(m.away.teamId)]); });
   return {name:j.settings.name, dynasty:false, keeper:false, slots, rosterSize: slots.length+(cnt[12]||0), irSlots: cnt[13]||0, regWeeks, playoffTeams: ss.playoffTeamCount||4,
@@ -1453,7 +1459,7 @@ async function buildFromSource(){
     const src = LDEF.mirror || LDEF.seed, X = await fetchSource(src);
     const teams = {}, rosters = {}, ids = [], tid = {};
     X.teams.forEach((T,i)=>{ const t = 't'+i; ids.push(t); tid[T.srcId] = t;
-      teams[t] = {name:T.name, src:T.srcId}; rosters[t] = {};
+      teams[t] = {name:T.name, src:T.srcId, owner:T.owner||'', ownerId:T.ownerId||'', real:T.real||null}; rosters[t] = {};
       T.players.forEach(pl=>{ rosters[t][pl.id] = {...snap({...X.info[pl.id], id:pl.id}), ...(pl.ir?{ir:true}:{}), rnd:1}; }); });
     const schedule = {};
     if (LDEF.mirror) for (const w in X.schedule) schedule['w'+w] = X.schedule[w].map(([a,b])=>[tid[a],tid[b]]).filter(p=>p[0]&&p[1]);
@@ -1481,6 +1487,7 @@ async function syncMirror(force){
     const moves = [];
     for (const T of X.teams){ const t = tid[T.srcId]; if (!t) continue;
       if (T.name && T.name!==S.teams[t].name) u['teams/'+t+'/name'] = T.name;
+      u['teams/'+t+'/real'] = T.real||null; u['teams/'+t+'/owner'] = T.owner||''; u['teams/'+t+'/ownerId'] = T.ownerId||'';
       const now = new Set(T.players.map(x=>x.id)), had = S.rosters[t]||{};
       for (const pid in had) if (!now.has(pid)){ u['rosters/'+t+'/'+pid] = null; moves.push(`${T.name} dropped ${had[pid].name}`); }
       for (const pl of T.players){ const was = had[pl.id];
@@ -1499,6 +1506,7 @@ async function syncMirror(force){
       for (const w in X.schedule) u['schedule/w'+w] = X.schedule[w].map(([a,b])=>[tid[a],tid[b]]).filter(p=>p[0]&&p[1]);
     }
     if (moves.length) u['log/'+Date.now()] = {ts:Date.now(), text:'Synced from '+src.src.toUpperCase()+': '+moves.slice(0,12).join(' · ')+(moves.length>12?` (+${moves.length-12} more)`:'')};
+    u['cup'] = Object.fromEntries(standings().map(r=>[r.t, {w:r.w, l:r.l, t:r.tie, pf:Math.round(r.pf*10)/10}]));
     u['sync'] = {at:Date.now(), through: days.length ? (dayNum(today)>1 ? dateOfDay(dayNum(today)-1) : through) : through, moves: moves.length};
     Store.update(u);
   }catch(e){ console.warn('mirror sync failed', e); toast('Could not sync from '+S.settings.mirror.src.toUpperCase()+': '+(e.message||e)); }
@@ -1512,6 +1520,75 @@ function mirrorBanner(){
   const m = S.settings.mirror, at = S.sync && S.sync.at;
   return `<div class="banner" style="margin-bottom:14px">🔁 <b>Mirror of ${m.src==='espn'?'ESPN':'Sleeper'} league</b> — read-only. Rosters, moves, ${m.src==='espn'?'daily':'weekly'} lineups and matchups copy over automatically and are scored with our rules: best <b>${S.settings.gameCap>=99?'(all)':S.settings.gameCap}</b> games per player${teamLimit()?`, <b>${teamLimit()}</b> team starts a week`:''}. Make real moves in ${m.src==='espn'?'ESPN':'Sleeper'}.
     <span class="muted small">Last sync: ${at?new Date(at).toLocaleString([], {month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}):'never'}</span> <button class="btn sm" onclick="syncMirror(true)">Sync now</button></div>`;
+}
+/* ======== THE TRI-CUP: one combined record per person across the 3 real leagues ======== */
+const CUP_LEAGUES = ['m-dyn','m-other','m-espn'];
+let CUP = {data:null, links:null, loading:false, at:0};
+const cupRef = () => firebase.database().ref(DB_ROOT+'/tricup');
+async function cupLoad(force){
+  if (CUP.loading || (!force && CUP.data && Date.now()-CUP.at < 60e3)) return;
+  CUP.loading = true;
+  try{
+    const data = {};
+    if (STORE_MODE==='firebase'){
+      const db = firebase.database();
+      await Promise.all(CUP_LEAGUES.map(async id=>{ const [t,c] = await Promise.all([db.ref(DB_ROOT+'/leagues/'+id+'/teams').once('value'), db.ref(DB_ROOT+'/leagues/'+id+'/cup').once('value')]); data[id] = {teams:t.val()||{}, cup:c.val()||{}}; }));
+      CUP.links = (await cupRef().once('value')).val() || {};
+    } else {
+      for (const id of CUP_LEAGUES){ let x = null; try{ x = JSON.parse(lsGet('b3h_'+(DEMO?'demo':'local')+'_'+id)||'null'); }catch(e){} data[id] = {teams:(x&&x.teams)||{}, cup:(x&&x.cup)||{}}; }
+      try{ CUP.links = JSON.parse(lsGet('b3h_tricup'+(DEMO?'_demo':''))||'{}'); }catch(e){ CUP.links = {}; }
+    }
+    CUP.data = data; CUP.at = Date.now();
+  }catch(e){ console.warn('tri-cup load', e); CUP.data = CUP.data || {}; CUP.links = CUP.links || {}; }
+  CUP.loading = false; if (ui.tab==='cup') render();
+}
+function cupSave(path, val){
+  CUP.links = CUP.links || {}; setPath(CUP.links, path, val);
+  if (STORE_MODE==='firebase') cupRef().child(path).set(val===undefined?null:val); else lsSet('b3h_tricup'+(DEMO?'_demo':''), JSON.stringify(CUP.links));
+  render();
+}
+const fbk = k => String(k).replace(/[.#$\[\]\/]/g,'_');
+const cupKey = (lg,t,T) => ((CUP.links&&CUP.links.link)||{})[lg+'~'+t] || T.ownerId || lg+'~'+t;
+function cupLink(lg,t,val){ const T = CUP.data[lg].teams[t]; cupSave('link/'+lg+'~'+t, val===(T.ownerId||lg+'~'+t) ? null : val); }
+function cupPeople(mode){
+  const P = {};
+  for (const lg of CUP_LEAGUES){ const d = (CUP.data||{})[lg]; if (!d) continue;
+    for (const t in d.teams){ const T = d.teams[t], k = cupKey(lg,t,T), rec = mode==='real' ? (T.real||{}) : (d.cup[t]||{});
+      const p = P[k] = P[k] || {k, name: ((CUP.links&&CUP.links.names)||{})[fbk(k)] || T.owner || T.name, w:0, l:0, t:0, pf:0, by:[]};
+      p.w += rec.w||0; p.l += rec.l||0; p.t += rec.t||0; p.pf += rec.pf||0;
+      p.by.push({lg, team:T.name, w:rec.w||0, l:rec.l||0, t:rec.t||0}); } }
+  const pct = p => (p.w+p.l+p.t) ? (p.w+p.t/2)/(p.w+p.l+p.t) : 0;
+  return Object.values(P).sort((a,b)=>pct(b)-pct(a) || b.w-a.w || b.pf-a.pf).map(p=>({...p, pct:pct(p)}));
+}
+const CUP_LG_NAME = {'m-dyn':'Dynasty', 'm-other':'Other League', 'm-espn':'ESPN'};
+function vCup(){
+  if (!CUP.data){ cupLoad(true); return `<h2>🏆 The Tri-Cup</h2><div class="card"><div class="skel" style="width:50%"></div><div class="skel"></div></div>`; }
+  cupLoad(false);
+  const mode = lsGet('b3h_cupmode') || 'real', rows = cupPeople(mode);
+  const missing = CUP_LEAGUES.filter(lg=>!Object.keys((CUP.data[lg]||{}).teams||{}).length);
+  const canLink = STORE_MODE!=='firebase' || isCommish();
+  let h = `<div class="row" style="justify-content:space-between"><h2>🏆 The Tri-Cup</h2>
+    <div class="seg">${[['real','Real league records'],['best3','Best-3 records']].map(([k,l])=>`<button class="${mode===k?'on':''}" onclick="lsSet('b3h_cupmode','${k}');render()">${l}</button>`).join('')}</div></div>
+    <p class="muted">Everyone's wins and losses from all three real leagues — The New Dynasty League, The Other League and Bronny James (ESPN) — added into one record.
+    ${mode==='real'?'<b>Real</b> = the actual records in Sleeper and ESPN.':'<b>Best-3</b> = every league re-scored with our rules (best '+S.settings.gameCap+' games per player), using the real matchups.'}</p>
+    ${missing.length?`<div class="banner">Not loaded yet: ${missing.map(x=>esc(CUP_LG_NAME[x])).join(', ')}. Open ${missing.length>1?'each one':'it'} once in the league switcher so it copies over. ${missing.map(x=>`<a href="#" onclick="switchLeague('${x}');return false">Open ${esc(CUP_LG_NAME[x])} →</a>`).join(' ')}</div>`:''}
+    <div class="card tw"><table><tr><th>#</th><th>Manager</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">${mode==='real'?'Points (league scoring)':'Points (our scoring)'}</th><th>By league</th></tr>
+    ${rows.map((p,i)=>`<tr><td><b>${i===0&&p.w?'🏆':i+1}</b></td><td><b>${esc(p.name)}</b> <span class="muted small">${p.by.length} league${p.by.length===1?'':'s'}</span></td>
+      <td class="num"><b>${p.w}</b></td><td class="num">${p.l}</td><td class="num">${p.t}</td><td class="num">${(p.pct*100).toFixed(1)}%</td><td class="num">${fmt(p.pf)}</td>
+      <td>${p.by.map(b=>`<span class="chip" title="${esc(b.team)}">${esc(CUP_LG_NAME[b.lg])} ${b.w}-${b.l}${b.t?'-'+b.t:''}</span>`).join(' ')}</td></tr>`).join('')}</table></div>
+    <p class="muted small">Records update whenever a league syncs (open it, or hit Sync now). Best-3 records count finished weeks only.</p>`;
+  // linking the same person across leagues (Sleeper matches automatically; ESPN accounts need linking once)
+  const people = cupPeople('real');
+  h += `<details class="card"${canLink&&people.length>12?' open':''}><summary style="cursor:pointer"><b>Link managers across leagues</b> <span class="muted small">— match each ESPN team to its Sleeper owner</span></summary>
+    <p class="muted small">Sleeper teams owned by the same Sleeper account join up automatically. ESPN uses different accounts, so pick who each ESPN team belongs to.${canLink?'':' <b>Only the commissioner can change links.</b>'}</p>
+    <div class="tw"><table><tr><th>League</th><th>Team</th><th>Account</th><th>Counts for</th></tr>`;
+  for (const lg of CUP_LEAGUES){ const d = CUP.data[lg]; if (!d) continue;
+    for (const t of Object.keys(d.teams).sort((a,b)=>+a.slice(1)-+b.slice(1))){ const T = d.teams[t], cur = cupKey(lg,t,T);
+      h += `<tr><td>${esc(CUP_LG_NAME[lg])}</td><td>${esc(T.name)}</td><td class="muted small">${esc(T.owner||'')}</td><td><select ${canLink?'':'disabled'} onchange="cupLink('${lg}','${t}',this.value)">
+        ${people.map(p=>`<option value="${esc(p.k)}" ${p.k===cur?'selected':''}>${esc(p.name)}</option>`).join('')}</select></td></tr>`; } }
+  h += `</table></div>
+    <h3>Display names</h3><div class="row" style="flex-wrap:wrap">${people.map(p=>`<label class="small" style="display:flex;gap:6px;align-items:center"><input ${canLink?'':'disabled'} style="width:150px" value="${esc(p.name)}" onchange="cupSave('names/'+fbk(${esc(JSON.stringify(p.k))}), this.value||null)"></label>`).join('')}</div></details>`;
+  return h;
 }
 function setSlot(t,d,i,pid){
   const lu = lineupForDay(t,d).slice(), j = pid ? lu.indexOf(pid) : -1;
