@@ -243,6 +243,40 @@ th.dcol.cur,td.dcol.cur{background:rgba(255,122,26,.08)}
 }
 .mobile-brand{display:none;align-items:center;gap:8px;font:400 22px 'Bebas Neue',sans-serif;letter-spacing:1px}
 .mobile-brand .logo{width:28px;height:28px;border-radius:9px;background:var(--grad);display:grid;place-items:center;color:#fff;font-size:18px}
+/* ---- v1.8.1 phone lineup: slot + player stay pinned, details under the name ---- */
+.monly,.mline{display:none}
+details.help summary{cursor:pointer;color:var(--mute);font-size:12.5px;font-weight:700;margin-bottom:6px}
+details.help[open] summary{margin-bottom:2px}
+@media(max-width:700px){
+  .monly{display:inline}
+  .mline{display:block;font-size:12px;color:var(--mute);margin-top:2px;padding-left:38px;white-space:nowrap}
+  .mline .chip{font-size:11px;padding:1px 6px}
+  .mhide{display:none}
+  .lu{--slotw:66px}
+  .lu table th,.lu table td{padding:8px 6px}
+  .lu td.c-slot,.lu th.c-slot{position:sticky;left:0;width:var(--slotw);min-width:var(--slotw);max-width:var(--slotw);z-index:2;background:var(--panel-solid);text-align:center}
+  .lu td.c-pl,.lu th.c-pl{position:sticky;left:var(--slotw);z-index:2;background:var(--panel-solid);width:min(50vw,215px);min-width:min(50vw,215px);max-width:min(50vw,215px);overflow:hidden;box-shadow:6px 0 10px -6px rgba(0,0,0,.7)}
+  .lu th.c-slot,.lu th.c-pl{z-index:3;background:#0e1424}
+  .lu td.c-slot{display:table-cell}
+  .lu td.c-slot .pos{display:block;margin:0 auto}
+  .lu td.c-slot .monly{display:block;margin-top:6px}
+  .lu .mvb{font-size:10px;padding:6px 0;width:100%;letter-spacing:.04em}
+  .lu .pcell{display:block;line-height:1.3}
+  .lu td.c-slot .monly{margin-top:4px}
+  .lu a.pl{display:flex;align-items:center;min-width:0}
+  .lu a.pl b,.lu a.pl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lu .psub{display:block;padding-left:38px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lu tr.mvsrc td.c-slot,.lu tr.mvsrc td.c-pl{background:linear-gradient(rgba(255,122,26,.16),rgba(255,122,26,.16)),var(--panel-solid)}
+  .lu tr.mvtarget td.c-slot,.lu tr.mvtarget td.c-pl{background:linear-gradient(rgba(59,142,234,.14),rgba(59,142,234,.14)),var(--panel-solid)}
+  .lu tr.mvdim td{opacity:.38}
+  .lu.card{padding:4px 0}
+  .days{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .days .btn{flex:0 0 auto}
+  .autoset{display:grid!important;grid-template-columns:1fr 1fr;gap:8px}
+  .autoset>b,.autoset>select,.autoset>label{grid-column:1/-1}
+  .autoset>select{width:100%;max-width:none}
+  .autoset>.btn{white-space:normal;line-height:1.2;padding:9px 8px}
+}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1349,11 +1383,13 @@ function vTeam(){
   const usedBefore = pid => ds.filter(e=>e<d).filter(e=>lineupForDay(t,e).includes(pid) && plays(pid,e)).length;
   let h = `<div class="row" style="justify-content:space-between"><h2>${esc(tName(t))}</h2><div class="row">
     <select onchange="ui.teamView=this.value;render()">${teamIds().map(x=>`<option value="${x}" ${x===t?'selected':''}>${esc(tName(x))}</option>`).join('')}</select>${weekSel('wk2')}</div></div>
-    <div class="row" style="margin-bottom:8px">${ds.map(x=>`<button class="btn sm ${x===d?'pri':''}" onclick="ui.day='${x}';render()">${dayName(x)} ${+x.slice(4,6)}/${+x.slice(6)}${dayLocked(x)?' 🔒':''}</button>`).join('')}</div>
-    <p class="muted small">Set your lineup <b>each day</b> (changes carry forward to the following days). A player's games only count on days he's in your lineup, and only his best ${cap} started games of the week count — no matter which slot he's in. ${locked?'<b>This day is locked.</b>':S.settings.lineupLock==='game'&&!isSim()?'Each player locks when his game tips off.':''} Roster ${ros.length}/${S.settings.rosterSize} · IR ${irIds(t).length}/${S.settings.irSlots}${S.settings.addsPerWeek?` · ${addsUsed(t)}/${S.settings.addsPerWeek} adds this matchup`:''}.</p>
+    <div class="row days" style="margin-bottom:8px">${ds.map(x=>`<button class="btn sm ${x===d?'pri':''}" onclick="ui.day='${x}';render()">${dayName(x)} ${+x.slice(4,6)}/${+x.slice(6)}${dayLocked(x)?' 🔒':''}</button>`).join('')}</div>
+    <p class="muted small" style="margin:0 0 6px">Roster ${ros.length}/${S.settings.rosterSize} · IR ${irIds(t).length}/${S.settings.irSlots}${S.settings.addsPerWeek?` · ${addsUsed(t)}/${S.settings.addsPerWeek} adds this matchup`:''}${locked?' · <b>This day is locked.</b>':''}</p>
+    <details class="help" ${(ui.helpOpen ?? innerWidth>900)?'open':''} ontoggle="ui.helpOpen=this.open"><summary>How lineups work</summary><p class="muted small">Set your lineup <b>each day</b> (changes carry forward to the following days). A player's games only count on days he's in your lineup, and only his best ${cap} started games of the week count — no matter which slot he's in. ${S.settings.lineupLock==='game'&&!isSim()?'Each player locks when his game tips off.':''}</p>
+    ${tmode()!=='stats'?`<p class="muted small" style="margin:0 0 4px">Each day shows the opponent (blue = in your lineup that day, dashed = on your bench). Played days show fantasy points: <span class="chip c">green</span> counted toward his best ${cap}, <span class="chip x">red</span> outside his best ${cap}, faded = scored on your bench.</p>`:''}</details>
     ${!MIRROR()&&ros.length>S.settings.rosterSize?`<div class="banner">Roster is over the ${S.settings.rosterSize}-player limit — drop ${ros.length-S.settings.rosterSize} before adding anyone.</div>`:''}
     ${S.settings.leagueType==='keeper'&&canEdit(t)?`<div class="card"><h3 style="margin-top:0">Keepers for next season (${Object.keys(S.keepers[t]||{}).length}/${S.settings.keepers})</h3><div class="row">${ros.map(x=>{ const on=!!(S.keepers[t]&&S.keepers[t][x]); const kr=keeperRound(t,x); return `<label class="tag" style="cursor:pointer"><input type="checkbox" ${on?'checked':''} onchange="toggleKeeper('${t}','${x}',this.checked)"> ${esc(pInfo(x).name)}${kr?` <span class="muted">· R${kr}</span>`:''}</label>`; }).join('')}</div><p class="muted small" style="margin:6px 0 0">Locked in when the commissioner starts next season.</p></div>`:''}
-    ${canEdit(t)?`<div class="card"><div class="row">
+    ${canEdit(t)?`<div class="card"><div class="row autoset">
       <b>Auto-set lineup</b>
       <select id="amode" onchange="lsSet('b3h_automode',this.value);$('#adesc').textContent=AUTO_MODES[this.value].desc">${Object.entries(AUTO_MODES).map(([k,m])=>`<option value="${k}" ${k===(lsGet('b3h_automode')||'proj')?'selected':''}>${m.label}</option>`).join('')}</select>
       <button class="btn" ${locked&&!isCommish()?'disabled':''} onclick="startActive('${t}','${d}',$('#amode').value)">Start active players (${dayName(d)})</button>
@@ -1367,28 +1403,28 @@ function vTeam(){
       <div class="seg">${[['schedule','📅 Schedule'],['stats','📊 Stats'],['both','Both']].map(([k,l])=>`<button class="${tmode()===k?'on':''}" onclick="lsSet('b3h_tmode','${k}');render()">${l}</button>`).join('')}</div>
       ${tmode()!=='schedule'?`<select title="Stat window" onchange="lsSet('b3h_tstat',this.value);render()">${Object.entries(STAT_VIEWS).map(([k,v])=>`<option value="${k}" ${k===tstat()?'selected':''}>${v}</option>`).join('')}</select>`:''}
     </div>
-    ${tmode()!=='stats'?`<p class="muted small" style="margin:-4px 0 10px">Each day shows the opponent (blue = in your lineup that day, dashed = on your bench). Played days show fantasy points: <span class="chip c">green</span> counted toward his best ${cap}, <span class="chip x">red</span> outside his best ${cap}, faded = scored on your bench.</p>`:''}
-    <div class="card tw"><table><tr><th>Slot</th><th>${edit?'Action':''}</th><th>Player — ${dayName(d)}</th><th>Today</th>${xhead(ds,d)}<th>Started games this week</th><th class="num">Week pts</th></tr>`;
+    <div class="card tw lu"><table><tr><th class="c-slot">Slot</th><th class="mhide">${edit?'Action':''}</th><th class="c-pl">Player — ${dayName(d)}</th><th class="mhide">Today</th>${xhead(ds,d)}<th class="mhide">Started games this week</th><th class="num mhide">Week pts</th></tr>`;
   const todayCell = pid => { if(!plays(pid,d)) return '<span class="muted small">no game</span>'; const g=gameOn(pid,d); if(g) return `<span class="chip ${ (rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span>`; const n=usedBefore(pid); return `<b>${esc(oppOn(pid,d)||'plays')}</b>${!isSim()&&fullGame(pInfo(pid).team,d)?` <span class="muted small">${new Date(fullGame(pInfo(pid).team,d).tip).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>`:''}${n>=cap?` <span class="small" style="color:var(--acc2)">(already ${n} games — only counts if it beats his worst)</span>`:''}`; };
+  const mToday = pid => { if(!plays(pid,d)) return 'No game'; const g=gameOn(pid,d); if(g) return `<span class="chip ${(rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span> today`; const n=usedBefore(pid), fg=!isSim()&&fullGame(pInfo(pid).team,d); return `<b style="color:var(--text)">${esc(oppOn(pid,d)||'plays')}</b>${fg?' '+new Date(fg.tip).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):''}${n>=cap?` <span style="color:var(--acc2)">· ${n} used</span>`:''}`; };
   S.settings.slots.forEach((slot,i)=>{
     const pid = lu[i], p = pid?pInfo(pid):null, r = pid&&rowOf(pid);
     /* name opens the player card (like ESPN); the separate Swap menu replaces him */
     const swapOpts = ros.filter(x=>x!==pid && eligible(slot,pInfo(x).pos) && !slotLocked(x)).map(x=>`<option value="${x}">${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ● '+esc(shortOpp(x,d)):' · no game'}</option>`).join('');
     const act = mv ? (canHereSlot(i) ? hereSlot(i) : (mv.pid===pid ? mvBtn(pid,i) : '')) : (pid ? mvBtn(pid,i) : '');
-    const cell = p ? `<div class="pcell">${slotLocked(pid)?'🔒 ':''}${pLink(pid,true)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span></div>` : '<span class="muted">Empty</span>';
+    const cell = p ? `<div class="pcell">${slotLocked(pid)?'🔒 ':''}${pLink(pid,true)} <span class="muted small psub">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span><div class="mline">${mToday(pid)} · Wk <b style="color:var(--text)">${r?fmt(r.pts):'0'}</b></div></div>` : '<span class="muted">Empty</span>';
     const dim = mv && mv.pid!==pid && !canHereSlot(i);
-    h += `<tr class="${mv&&mv.pid===pid?'mvsrc':''}${dim?' mvdim':''}"><td><span class="pos">${slot}</span></td><td class="mvc">${act}</td><td>${cell}</td><td>${p?todayCell(pid):''}</td>${xcols(t,pid,ds,d,r)}
-      <td>${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" style="${g.overLimit?'text-decoration:line-through':''}" title="${dayName(g.date)}${g.overLimit?' — team starts were used up':g.counted?'':' — not in his best '+cap}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num"><b>${r?fmt(r.pts):''}</b></td></tr>`;
+    h += `<tr class="${mv&&mv.pid===pid?'mvsrc':''}${dim?' mvdim':''}"><td class="c-slot"><span class="pos">${slot}</span><span class="monly">${act}</span></td><td class="mvc mhide">${act}</td><td class="c-pl">${cell}</td><td class="mhide">${p?todayCell(pid):''}</td>${xcols(t,pid,ds,d,r)}
+      <td class="mhide">${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" style="${g.overLimit?'text-decoration:line-through':''}" title="${dayName(g.date)}${g.overLimit?' — team starts were used up':g.counted?'':' — not in his best '+cap}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num mhide"><b>${r?fmt(r.pts):''}</b></td></tr>`;
   });
   const benchPts = T.rows.filter(r=>!lu.includes(r.pid));
-  h += `<tr><td></td><td></td><td><b>Week total</b></td><td></td>${xfoot(t,ds,d,lu)}<td></td><td class="num"><b>${fmt(T.total)}</b></td></tr></table></div>
+  h += `<tr><td class="c-slot"></td><td class="mhide"></td><td class="c-pl"><b>Week total</b><span class="monly"> <b style="color:var(--good)">${fmt(T.total)}</b></span></td><td class="mhide"></td>${xfoot(t,ds,d,lu)}<td class="mhide"></td><td class="num mhide"><b>${fmt(T.total)}</b></td></tr></table></div>
     ${benchPts.length?`<p class="muted small">Also counting this week (started on other days): ${benchPts.map(r=>`${pLink(r.pid)} ${fmt(r.pts)}`).join(' · ')}</p>`:''}
-    <h3>Bench — ${dayName(d)}</h3><div class="card tw"><table><tr><th>${edit?'Action':''}</th><th>Player</th><th>Pos</th><th>Team</th>${xhead(ds,d)}<th>Today</th><th></th></tr>${mv&&mv.from>=0?`<tr class="mvtarget"><td class="mvc"><button class="mvb here" onclick="ui.mv=null;setSlot('${t}','${d}',${mv.from},'')">HERE</button></td><td colspan="40"><b>Move ${esc(pInfo(mv.pid).name)} to the bench</b></td></tr>`:''}${bench.map(p=>{const i=pInfo(p);const dimB = mv && mv.pid!==p && !canHereBench(p);return `<tr class="${mv&&mv.pid===p?'mvsrc':''}${dimB?' mvdim':''}"><td class="mvc">${mv ? (canHereBench(p) ? hereBench(p) : (mv.pid===p ? mvBtn(p,-1) : '')) : mvBtn(p,-1)}</td><td>${pLink(p)}${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</td><td><span class="pos">${esc(i.pos)}</span></td><td>${esc(i.team)}</td>${xcols(t,p,ds,d,T.rows.find(r=>r.pid===p))}<td>${plays(p,d)?`<b>${esc(oppOn(p,d)||'plays')}</b> <span class="muted small">(won't count on bench)</span>`:'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
+    <h3>Bench — ${dayName(d)}</h3><div class="card tw lu"><table><tr><th class="c-slot">${edit?'Action':''}</th><th class="c-pl">Player</th><th class="mhide">Pos</th><th class="mhide">Team</th>${xhead(ds,d)}<th class="mhide">Today</th><th></th></tr>${mv&&mv.from>=0?`<tr class="mvtarget"><td class="mvc c-slot"><button class="mvb here" onclick="ui.mv=null;setSlot('${t}','${d}',${mv.from},'')">HERE</button></td><td colspan="40"><b>Move ${esc(pInfo(mv.pid).name)} to the bench</b></td></tr>`:''}${bench.map(p=>{const i=pInfo(p);const dimB = mv && mv.pid!==p && !canHereBench(p);return `<tr class="${mv&&mv.pid===p?'mvsrc':''}${dimB?' mvdim':''}"><td class="mvc c-slot">${mv ? (canHereBench(p) ? hereBench(p) : (mv.pid===p ? mvBtn(p,-1) : '')) : mvBtn(p,-1)}</td><td class="c-pl"><div class="pcell">${pLink(p,true)}<span class="mhide">${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</span><span class="monly muted small psub">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span><div class="mline">${mToday(p)}</div></div></td><td class="mhide"><span class="pos">${esc(i.pos)}</span></td><td class="mhide">${esc(i.team)}</td>${xcols(t,p,ds,d,T.rows.find(r=>r.pid===p))}<td class="mhide">${plays(p,d)?`<b>${esc(oppOn(p,d)||'plays')}</b> <span class="muted small">(won't count on bench)</span>`:'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
     ${S.settings.irSlots?`<h3>Injured reserve (${irIds(t).length}/${S.settings.irSlots})</h3><div class="card tw"><table>${irIds(t).map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)} <span class="muted small">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span></td><td class="num">${canEdit(t)?`<button class="btn sm" onclick="activateIR('${t}','${p}')">Activate</button> <button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted small">Empty. Players listed as OUT can be moved here from the bench to free a roster spot (games on IR never count).</td></tr>'}</table></div>`:''}`;
   return h;
 }
 /* My Team view mode: schedule grid, stats, or both (remembered per browser) */
-const tmode = () => lsGet('b3h_tmode') || 'both';
+const tmode = () => lsGet('b3h_tmode') || (innerWidth<=700 ? 'schedule' : 'both');
 const tstat = () => lsGet('b3h_tstat') || 'season';
 const shortOpp = (pid,d) => (oppOn(pid,d)||'').replace(/^vs /,'').replace(/^@ /,'@').replace(/ ·.*/,'');
 function xhead(ds,d){
