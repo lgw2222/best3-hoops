@@ -60,6 +60,13 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-
 #ticker:hover .tk{animation-play-state:paused}
 #ticker .tk span b{color:#fff}
 @keyframes tick{to{transform:translateX(-100%)}}
+#lgSel{max-width:230px;font-weight:700}
+#who{display:flex;align-items:center;gap:10px}
+#who .who{display:flex;align-items:center;gap:8px;font-size:13px;line-height:1.15}
+#who .lbl{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.login-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:14px}
+.login-team{display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:inherit;font:inherit;cursor:pointer;transition:all .25s var(--ease)}
+.login-team:hover{border-color:rgba(255,122,26,.6);transform:translateY(-2px);background:rgba(255,122,26,.08)}
 .me-pick{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute)}
 main{width:100%;max-width:1240px;margin:0 auto;padding:22px}
 .spacer{flex:1}
@@ -155,6 +162,10 @@ a{color:var(--blue)}
 .spark i:last-child{opacity:1}
 .spark.up i:last-child{background:var(--good)}.spark.down i:last-child{background:var(--bad)}
 /* hero stat tiles */
+.pcell{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+select.swap{padding:4px 8px;font-size:11.5px;font-weight:700;border-radius:9px;width:auto;max-width:150px;color:var(--mute)}
+select.swap:hover{color:#fff;border-color:rgba(255,122,26,.6)}
+select.swap.add{color:#fff;border-style:dashed}
 .seg{display:inline-flex;padding:4px;gap:4px;border-radius:13px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
 .seg button{border:0;background:none;color:var(--mute);font:700 12.5px Inter,sans-serif;padding:7px 14px;border-radius:9px;cursor:pointer;transition:all .25s var(--ease)}
 .seg button.on{background:var(--grad);color:#fff;box-shadow:0 6px 16px -8px rgba(255,61,119,.8)}
@@ -184,6 +195,7 @@ th.dcol.cur,td.dcol.cur{background:rgba(255,122,26,.08)}
   .mu .tm{font-size:12px;gap:6px}
   .mu .av{display:none}
   .me-pick .lbl{display:none}
+  #who .lbl{display:none} #who .who .av{display:none}
   .me-pick select{max-width:150px}
   .tiles{grid-template-columns:repeat(2,1fr)}
   .tile .v{font-size:28px}
@@ -206,7 +218,9 @@ th.dcol.cur,td.dcol.cur{background:rgba(255,122,26,.08)}
     <header id="topbar">
       <div class="mobile-brand"><div class="logo">3</div>BEST OF 3</div>
       <div id="ticker"></div>
-      <label class="me-pick"><span class="lbl">Acting as</span> <select id="meSel"></select></label>
+      <select id="lgSel" title="Switch league" onchange="switchLeague(this.value)"></select>
+      <label class="me-pick"><span class="lbl">Acting as (testing)</span> <select id="meSel"></select></label>
+      <div id="who"></div>
     </header>
     <main id="view"><div class="card"><div class="skel" style="width:40%"></div><div class="skel"></div><div class="skel" style="width:70%"></div></div></main>
   </div>
@@ -220,14 +234,27 @@ th.dcol.cur,td.dcol.cur{background:rgba(255,122,26,.08)}
    ================================================================= */
 const FIREBASE_CONFIG = { databaseURL: 'https://dynasty-draft-4934f-default-rtdb.firebaseio.com', projectId: 'dynasty-draft-4934f' };
 const DB_ROOT = 'best3hoops';        // everything this site saves lives under this one folder in the database
-const LEAGUE_ID = 'main';
+/* Every league on the site. Pick one with the switcher at the top (it adds ?league=<id> to the address).
+   mirror = copies a real Sleeper/ESPN league and keeps following it (read-only, scored with our rules)
+   seed   = copies a real league's rosters ONCE, then the league runs here like any other */
+const LEAGUES = [
+  {id:'main',    name:'Best of 3 Hoops'},
+  {id:'dyn',     name:'Dynasty — our rules', seed:{src:'sleeper', id:'1416329086271320064'}},
+  {id:'m-dyn',   name:'Mirror · The New Dynasty League', mirror:{src:'sleeper', id:'1416329086271320064'}},
+  {id:'m-other', name:'Mirror · The Other League', mirror:{src:'sleeper', id:'1402115472383549440'}},
+  {id:'m-espn',  name:'Mirror · Bronny James (ESPN)', mirror:{src:'espn', id:'199278'}}
+];
+const LEAGUE_ID = (()=>{ const m = location.search.match(/[?&]league=([\w-]+)/); return m && LEAGUES.some(l=>l.id===m[1]) ? m[1] : 'main'; })();
+const LDEF = LEAGUES.find(l=>l.id===LEAGUE_ID);
+const lk = k => LEAGUE_ID==='main' ? k : k+'@'+LEAGUE_ID;     // per-league browser keys (your team, login, commissioner)
+function switchLeague(id){ const q = new URLSearchParams(location.search); if (id==='main') q.delete('league'); else q.set('league', id); location.search = q.toString(); }
 const DEMO = /[?&]demo=1/.test(location.search);   // add ?demo=1 to the URL for a private sandbox that never touches the real league
 
 const DEFAULT_SETTINGS = {
   name: 'Bronny James', numTeams: 8, rosterSize: 15, irSlots: 4,
   slots: ['PG','SG','SF','PF','C','G','F','UTIL','UTIL','UTIL'],
   scoring: {PTS:1, FGM:1, REB:1, AST:1, STL:1, BLK:1, TO:-1, DD:5, TD:10},
-  gameCap: 3, teamStarts: 0, statsMode: 'sim', simWeek: 2, simDay: 3, simSeed: 1,
+  gameCap: 3, teamStarts: -1, statsMode: 'sim', simWeek: 2, simDay: 3, simSeed: 1,
   lineupLock: 'game',                       // 'game' = each player locks at his tip-off (ESPN), 'day' = whole day locks at first tip
   acqSystem: 'waivers', waiverDays: 2, addsPerWeek: 7,
   tradeReviewDays: 2, vetoVotes: 4, tradeDeadline: '',
@@ -289,7 +316,7 @@ function weekDone(w){ if(isSim()) return w<=S.settings.simWeek; const d=weekDate
 
 /* ---------- store (Firebase or local demo) ---------- */
 let S = null, STORE_MODE = 'local', fbRef = null, bkRef = null, bc = null, LOADED = false, CONNECTED = false, LOST_COPY = null;
-const LS_KEY = 'b3h_'+(DEMO?'demo':'local');
+const LS_KEY = 'b3h_'+(DEMO?'demo':'local')+(LEAGUE_ID==='main'?'':'_'+LEAGUE_ID);
 const MIRROR_KEY = 'b3h_mirror_'+LEAGUE_ID;
 function setPath(obj,path,val){ const k=path.split('/'); let o=obj; for(let i=0;i<k.length-1;i++){ if(typeof o[k[i]]!=='object'||o[k[i]]===null) o[k[i]]={}; o=o[k[i]]; } if(val===null||val===undefined) delete o[k[k.length-1]]; else o[k[k.length-1]]=val; }
 function normalize(x){ if(!x||!x.settings) return null; x.settings={...DEFAULT_SETTINGS,...x.settings}; x.settings.scoring={...DEFAULT_SETTINGS.scoring,...(x.settings.scoring||{})}; for(const k of ['teams','rosters','lineups','trades','log','keepers','history','waivers','claims','adds']) x[k]=x[k]||{}; x.draft=x.draft||{status:'pre',order:Object.keys(x.teams),picks:{}}; x.draft.picks=x.draft.picks||{}; x.draft.order=x.draft.order||Object.keys(x.teams); return x; }
@@ -625,6 +652,8 @@ function gameOn(pid,d){
    Goes day by day through the week. A player's game only counts if he was in an ACTIVE lineup slot that day
    (any slot — PG, UTIL, whatever; the cap follows the PLAYER, not the slot). Then each player's started games
    are sorted high→low and only his top N (gameCap) count. Bench games never count. */
+/* team starts per week: -1 = auto (starting spots x games per player), 0 = off, N = fixed */
+function teamLimit(){ const v = +S.settings.teamStarts || 0, cap = S.settings.gameCap; if (v<0) return cap>=99 ? 0 : S.settings.slots.length*cap; return v; }
 function teamWeek(t,w){
   return memo('tw|'+t+'|'+w, ()=>{
     const cap = S.settings.gameCap, P = new Map();
@@ -638,7 +667,7 @@ function teamWeek(t,w){
       });
     }
     let total = 0, used = 0;
-    const limit = +S.settings.teamStarts || 0;
+    const limit = teamLimit();
     if (!limit){
       // no team limit: each player's best N started games count
       for (const r of P.values()){
@@ -776,7 +805,7 @@ function playoffRounds(){
   for (let r=1;r<=rounds;r++){ const len = r===rounds ? (s.champRoundWeeks||1) : (s.playoffRoundWeeks||1); out.push({r, weeks:Array.from({length:len},(_,i)=>w+i), final:r===rounds}); w += len; }
   return out;
 }
-function regMatchups(w){ const rr = roundRobin(teamIds()); return rr[(w-1)%rr.length].filter(p=>p[0]&&p[1]); }
+function regMatchups(w){ const sc = S.schedule && S.schedule['w'+w]; if (sc) return Object.values(sc).map(x=>Object.values(x)).filter(p=>p[0]&&p[1]&&S.teams[p[0]]&&S.teams[p[1]]); const rr = roundRobin(teamIds()); return rr[(w-1)%rr.length].filter(p=>p[0]&&p[1]); }
 function standings(){
   return memo('standings', ()=>{
     const st = {}; teamIds().forEach(t=>st[t]={t,w:0,l:0,tie:0,pf:0,pa:0});
@@ -1031,6 +1060,7 @@ function processTrades(u, force){
 let lastProc = 0, procBusy = false;
 /* runs waivers + trade reviews whose time is up. Called on page loads and by the Sim Lab clock (force) */
 async function processPending(force){
+  if (MIRROR()) return;
   if (!S || S.draft.status!=='done' || procBusy) return; lastProc = Date.now();
   const dueW = Object.values(S.waivers).some(w=>force || w.until<=Date.now()), dueT = Object.values(S.trades).some(t=>t.status==='review' && (force || t.reviewUntil<=Date.now()));
   const needOrder = !S.waiverOrder;
@@ -1048,20 +1078,63 @@ async function processPending(force){
 
 /* ---------- UI state ---------- */
 const ui = { tab: lsGet('b3h_tab')||'matchup', week:null, day:null, open:null, q:'', pos:'ALL', avail:true, teamView:null, tradeWith:null, tradeGive:new Set(), tradeGet:new Set() };
-let ME = lsGet('b3h_me')||'t0';
-const isCommish = () => lsGet('b3h_commish')==='1';
+let ME = lsGet(lk('b3h_me'))||'t0';
+const isCommish = () => lsGet(lk('b3h_commish'))==='1';
 function toggleCommish(on){
-  if (!on){ lsSet('b3h_commish','0'); render(); return; }
-  if (STORE_MODE!=='firebase'){ lsSet('b3h_commish','1'); render(); return; }
+  if (!on){ lsSet(lk('b3h_commish'),'0'); render(); return; }
+  if (STORE_MODE!=='firebase'){ lsSet(lk('b3h_commish'),'1'); render(); return; }
   const have = S.settings.commishPin;
   const pin = prompt(have ? 'Commissioner PIN:' : 'Create a commissioner PIN (only you should know it):');
   if (!pin){ render(); return; }
   const h = String(hash('b3h|'+pin));
-  if (!have){ Store.update({'settings/commishPin':h}); lsSet('b3h_commish','1'); render(); return; }
-  if (h===have){ lsSet('b3h_commish','1'); } else toast('Wrong PIN.');
+  if (!have){ Store.update({'settings/commishPin':h}); lsSet(lk('b3h_commish'),'1'); render(); return; }
+  if (h===have){ lsSet(lk('b3h_commish'),'1'); } else toast('Wrong PIN.');
   render();
 }
-const canEdit = t => t===ME || isCommish();
+/* ---------- team login ----------
+   On the real (online) league everyone signs in as their own team with a PIN.
+   You can look at every team, but you can only change your own (the commissioner can change any).
+   The sandbox (?demo=1) and "this browser only" leagues keep the free team switcher for testing. */
+const MIRROR = () => !!(S && S.settings.mirror);
+const LOGIN = () => STORE_MODE==='firebase' && !DEMO && !MIRROR();
+const pinH = (t,pin) => String(hash('b3h-team|'+t+'|'+pin));
+function authTeam(){
+  if (!LOGIN()) return ME;
+  const a = (lsGet(lk('b3h_auth'))||'').split(':'), t = a[0];
+  return S && S.teams[t] && S.teams[t].pin && S.teams[t].pin===a[1] ? t : null;
+}
+const canEdit = t => !MIRROR() && (isCommish() || (t===ME && (!LOGIN() || authTeam()===t)));
+function loginPick(t){
+  const claimed = !!S.teams[t].pin;
+  openModal(`<div class="row" style="gap:12px">${tAv(t)}<div><h3 style="margin:0">${esc(tName(t))}</h3><span class="muted small">${claimed?'Enter your team PIN':'First time? Create a PIN for this team — you\'ll use it to sign in on any device.'}</span></div></div>
+    <div class="row" style="margin-top:12px"><input id="pin1" type="password" inputmode="numeric" placeholder="PIN" style="max-width:160px" onkeydown="if(event.key==='Enter')loginGo('${t}')">
+    ${claimed?'':`<input id="pin2" type="password" inputmode="numeric" placeholder="Repeat PIN" style="max-width:160px" onkeydown="if(event.key==='Enter')loginGo('${t}')">`}</div>
+    <p id="pinErr" class="small" style="color:var(--bad,#ff5d73);min-height:1em"></p>
+    <div class="row"><button class="btn pri" onclick="loginGo('${t}')">${claimed?'Sign in':'Create PIN & sign in'}</button><button class="btn" onclick="closeModal()">Cancel</button></div>
+    ${claimed?'<p class="muted small">Forgot it? The commissioner can reset your PIN.</p>':''}`);
+  setTimeout(()=>{ const e=$('#pin1'); e&&e.focus(); }, 50);
+}
+function loginGo(t){
+  const a = ($('#pin1')||{}).value||'', b = $('#pin2') ? $('#pin2').value : a, err = m => { $('#pinErr').textContent = m; };
+  if (a.length < 4) return err('PIN must be at least 4 characters.');
+  const have = S.teams[t].pin, h = pinH(t,a);
+  if (!have){
+    if (a!==b) return err("PINs don't match.");
+    Store.update({['teams/'+t+'/pin']: h});
+  } else if (h!==have) return err('Wrong PIN.');
+  lsSet(lk('b3h_auth'), t+':'+h); ME = t; lsSet(lk('b3h_me'), t); ui.teamView = null;
+  closeModal(); go('team');
+}
+function logout(){ lsSet(lk('b3h_auth'),''); lsSet(lk('b3h_commish'),'0'); render(); }
+function resetPin(t){ if (!confirm(`Reset the PIN for ${tName(t)}? They'll create a new one next time they sign in.`)) return; Store.update({['teams/'+t+'/pin']: null}); }
+function renderLogin(){
+  $('#tabs').innerHTML = '';
+  $('#view').innerHTML = `<div class="card" style="max-width:640px;margin:30px auto">
+    <h2 style="margin-top:0">Sign in to ${esc(S.settings.name)}</h2>
+    <p class="muted">Pick your team. You'll be able to look at every team, but you can only set lineups, add/drop and make trades for <b>your own</b>.</p>
+    <div class="login-grid">${teamIds().map(t=>`<button class="login-team" onclick="loginPick('${t}')">${tAv(t)}<span><b>${esc(tName(t))}</b><br><span class="muted small">${S.teams[t].pin?'🔒 Claimed':'Not claimed yet'}</span></span></button>`).join('')}</div>
+  </div>`;
+}
 function toast(msg){ openModal(`<p>${esc(msg)}</p><div class="row"><button class="btn pri" onclick="closeModal()">OK</button></div>`); }
 function openModal(html){ $('#modalBody').innerHTML = html; $('#modal').style.display='flex'; }
 function closeModal(){ $('#modal').style.display='none'; $('#modalBody').classList.remove('wide'); CARD_PID=null; ui.cardMore=false; }
@@ -1111,19 +1184,27 @@ function weekSel(id){ const cw=curWeek(), w=ui.week||cw, pr=playoffRounds(); let
 let lastLiveReq = '';
 function render(){
   MEMO.clear();
+  $('#lgSel').innerHTML = LEAGUES.map(l=>`<option value="${l.id}" ${l.id===LEAGUE_ID?'selected':''}>${esc(l.name)}</option>`).join('');
   $('#meSel').parentElement.style.display = S ? '' : 'none';
   if (!S && ui.tab==='mock'){ $('#tabs').innerHTML=`<button class="on">Mock Draft</button><button onclick="go('matchup')">← Create league</button>`; $('#view').innerHTML=vMock(); renderMockList(); return; }
+  if (!S && LOADED && (LDEF.mirror||LDEF.seed) && !LOST_COPY){ if (!BUILDING) buildFromSource(); $('#tabs').innerHTML=''; $('#view').innerHTML = `<div class="card"><h2 style="margin-top:0">${esc(LDEF.name)}</h2><p>${BUILD_ERR?'<b>Could not load it:</b> '+esc(BUILD_ERR)+' <button class="btn sm" onclick="BUILD_ERR=\'\';render()">Try again</button>':'Copying the league from '+(LDEF.mirror||LDEF.seed).src.toUpperCase()+'…'}</p><div class="skel" style="width:60%"></div></div>`; return; }
   if (!S){ renderSetup(); return; }
+  if (LOGIN()){ const a = authTeam(); if (!a){ $('#lgname').textContent = S.settings.name; $('#meSel').parentElement.style.display='none'; $('#who').innerHTML=''; renderLogin(); return; } ME = a; }
   if (!S.teams[ME]) ME = teamIds()[0];
   $('#lgname').textContent = S.settings.name;
+  $('#meSel').parentElement.style.display = LOGIN() ? 'none' : '';
+  $('#meSel').parentElement.querySelector('.lbl').textContent = MIRROR() ? 'Your team' : 'Acting as (testing)';
+  if (MIRROR() && (ui.tab==='draft'||ui.tab==='sim')) ui.tab = 'team';
+  $('#who').innerHTML = LOGIN() ? `<span class="who">${tAv(ME)}<span><span class="lbl">Signed in as</span><br><b>${esc(tName(ME))}</b>${isCommish()?' <span class="tag" style="margin-left:4px">Commish</span>':''}</span></span><button class="btn sm" onclick="logout()">Log out</button>` : '';
   $('#meSel').innerHTML = teamIds().map(t=>`<option value="${t}" ${t===ME?'selected':''}>${esc(tName(t))}</option>`).join('');
   paintTag();
-  $('#tabs').innerHTML = TABS.map(([k,l])=>`<button class="${ui.tab===k?'on':''}" onclick="go('${k}')">${icon(k)}<span>${l}</span></button>`).join('');
+  $('#tabs').innerHTML = TABS.filter(([k])=>!(MIRROR() && (k==='draft'||k==='sim'))).map(([k,l])=>`<button class="${ui.tab===k?'on':''}" onclick="go('${k}')">${icon(k)}<span>${l}</span></button>`).join('');
   const w = ui.week||curWeek();
   if (!isSim()){ const key=w+'|'+todayStr(); if(key!==lastLiveReq){ lastLiveReq=key; loadLiveWeek(w); } }
   if (S.draft.status==='done' && Date.now()-lastProc > 30000) setTimeout(()=>processPending(false), 0);
   const v = {settings:vSettings, matchup:vMatchup, cast:vCast, team:vTeam, players:vPlayers, draft:vDraft, mock:vMock, sim:vSim, trades:vTrades, standings:vStandings, league:vLeague}[ui.tab] || vMatchup;
-  const view = $('#view'); view.innerHTML = v();
+  const view = $('#view'); view.innerHTML = mirrorBanner() + v();
+  if (MIRROR()) setTimeout(()=>syncMirror(false), 300);
   if (ui.anim){ view.classList.remove('enter'); void view.offsetWidth; view.classList.add('enter'); countUp(view); ui.anim = false; }
   else view.querySelectorAll('[data-count]').forEach(el=>el.textContent = fmt(+el.dataset.count));
   buildTicker();
@@ -1211,7 +1292,7 @@ function vTeam(){
     <select onchange="ui.teamView=this.value;render()">${teamIds().map(x=>`<option value="${x}" ${x===t?'selected':''}>${esc(tName(x))}</option>`).join('')}</select>${weekSel('wk2')}</div></div>
     <div class="row" style="margin-bottom:8px">${ds.map(x=>`<button class="btn sm ${x===d?'pri':''}" onclick="ui.day='${x}';render()">${dayName(x)} ${+x.slice(4,6)}/${+x.slice(6)}${dayLocked(x)?' 🔒':''}</button>`).join('')}</div>
     <p class="muted small">Set your lineup <b>each day</b> (changes carry forward to the following days). A player's games only count on days he's in your lineup, and only his best ${cap} started games of the week count — no matter which slot he's in. ${locked?'<b>This day is locked.</b>':S.settings.lineupLock==='game'&&!isSim()?'Each player locks when his game tips off.':''} Roster ${ros.length}/${S.settings.rosterSize} · IR ${irIds(t).length}/${S.settings.irSlots}${S.settings.addsPerWeek?` · ${addsUsed(t)}/${S.settings.addsPerWeek} adds this matchup`:''}.</p>
-    ${ros.length>S.settings.rosterSize?`<div class="banner">Roster is over the ${S.settings.rosterSize}-player limit — drop ${ros.length-S.settings.rosterSize} before adding anyone.</div>`:''}
+    ${!MIRROR()&&ros.length>S.settings.rosterSize?`<div class="banner">Roster is over the ${S.settings.rosterSize}-player limit — drop ${ros.length-S.settings.rosterSize} before adding anyone.</div>`:''}
     ${S.settings.leagueType==='keeper'&&canEdit(t)?`<div class="card"><h3 style="margin-top:0">Keepers for next season (${Object.keys(S.keepers[t]||{}).length}/${S.settings.keepers})</h3><div class="row">${ros.map(x=>{ const on=!!(S.keepers[t]&&S.keepers[t][x]); const kr=keeperRound(t,x); return `<label class="tag" style="cursor:pointer"><input type="checkbox" ${on?'checked':''} onchange="toggleKeeper('${t}','${x}',this.checked)"> ${esc(pInfo(x).name)}${kr?` <span class="muted">· R${kr}</span>`:''}</label>`; }).join('')}</div><p class="muted small" style="margin:6px 0 0">Locked in when the commissioner starts next season.</p></div>`:''}
     ${canEdit(t)?`<div class="card"><div class="row">
       <b>Auto-set lineup</b>
@@ -1220,6 +1301,7 @@ function vTeam(){
       <button class="btn pri" onclick="autoSet('${t}',${w},$('#amode').value)">Auto-set rest of Week ${w}</button>
       <label class="small"><input type="checkbox" ${S.teams[t].autopilot?'checked':''} onchange="Store.update({['teams/${t}/autopilot']:this.checked?$('#amode').value:null})"> Autopilot (auto-set every day I don't set myself)</label>
     </div><p id="adesc" class="muted small" style="margin:6px 0 0">${AUTO_MODES[lsGet('b3h_automode')||'proj'].desc}${S.teams[t].autopilot?` <b>Autopilot is on (${AUTO_MODES[S.teams[t].autopilot].label}).</b>`:''}</p></div>`:''}
+    ${t!==ME && !isCommish() ? `<div class="banner">You're viewing <b>${esc(tName(t))}</b> — read only. You can only manage <b>${esc(tName(ME))}</b>. <a href="#" onclick="ui.teamView=null;render();return false">Back to my team →</a></div>` : ''}
     ${weekNote(w,d)}
     <div class="row" style="margin:4px 0 10px;justify-content:space-between">
       ${T.limit?`<span class="chip ${T.used>=T.limit?'x':'c'}" title="Team starts used this week. Maxed players swapping in a better game don't use a start.">Team starts: <b>${T.used}</b> / ${T.limit}</span>`:''}
@@ -1231,7 +1313,12 @@ function vTeam(){
   const todayCell = pid => { if(!plays(pid,d)) return '<span class="muted small">no game</span>'; const g=gameOn(pid,d); if(g) return `<span class="chip ${ (rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span>`; const n=usedBefore(pid); return `<b>${esc(oppOn(pid,d)||'plays')}</b>${!isSim()&&fullGame(pInfo(pid).team,d)?` <span class="muted small">${new Date(fullGame(pInfo(pid).team,d).tip).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>`:''}${n>=cap?` <span class="small" style="color:var(--acc2)">(already ${n} games — only counts if it beats his worst)</span>`:''}`; };
   S.settings.slots.forEach((slot,i)=>{
     const pid = lu[i], p = pid?pInfo(pid):null, r = pid&&rowOf(pid);
-    const cell = edit && !slotLocked(pid) ? (pid?`<a class="pl small" title="Player card" onclick="openPlayer('${pid}')">ⓘ</a> `:'')+`<select onchange="setSlot('${t}','${d}',${i},this.value)"><option value="">— empty —</option>${ros.filter(x=>eligible(slot,pInfo(x).pos) && (x===pid || !slotLocked(x))).map(x=>`<option value="${x}" ${x===pid?'selected':''}>${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ●':''}</option>`).join('')}</select>`
+    /* name opens the player card (like ESPN); the separate Swap menu replaces him */
+    const swapOpts = ros.filter(x=>x!==pid && eligible(slot,pInfo(x).pos) && !slotLocked(x)).map(x=>`<option value="${x}">${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ● '+esc(shortOpp(x,d)):' · no game'}</option>`).join('');
+    const cell = edit && !slotLocked(pid) ? (pid
+        ? `<div class="pcell">${pLink(pid,true)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>
+           <select class="swap" title="Swap this player" onchange="if(this.value!=='__')setSlot('${t}','${d}',${i},this.value)"><option value="__" selected>⇄ Swap</option><option value="">Move to bench</option>${swapOpts}</select></div>`
+        : `<select class="swap add" onchange="if(this.value!=='__')setSlot('${t}','${d}',${i},this.value)"><option value="__" selected>＋ Fill slot</option>${swapOpts}</select>`)
       : (p?`${slotLocked(pid)?'🔒 ':''}${pLink(pid)} <span class="muted small">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span>`:'<span class="muted">Empty</span>');
     h += `<tr><td><span class="pos">${slot}</span></td><td>${cell}</td><td>${p?todayCell(pid):''}</td>${xcols(t,pid,ds,d,r)}
       <td>${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" style="${g.overLimit?'text-decoration:line-through':''}" title="${dayName(g.date)}${g.overLimit?' — team starts were used up':g.counted?'':' — not in his best '+cap}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num"><b>${r?fmt(r.pts):''}</b></td></tr>`;
@@ -1290,6 +1377,141 @@ function weekNote(w,d){
   const day = !Object.keys(FULL[d]||{}).length ? `<div class="banner">No NBA games on the schedule for ${dayName(d)} ${+d.slice(4,6)}/${+d.slice(6)} — that's why everyone shows "no game". Pick another day above, or flip to <b>Schedule</b> to see the whole week.</div>` : '';
   if (n >= 25) return day;
   return `<div class="banner">Light week on the real NBA schedule — only ${n} game${n===1?'':'s'} listed so far${n<12?' (NBA Cup / break week: ESPN shows the knockout games as TBD, and the NBA adds the other teams’ games later — they’ll appear here automatically)':''}.</div>` + day;
+}
+/* ======== copying & mirroring real leagues (Sleeper + ESPN) ======== */
+let BUILDING = false, BUILD_ERR = '', SLEEPER_P = null, EXTRA_P = null;
+const ESPN_TEAM = {1:'ATL',2:'BOS',3:'NO',4:'CHI',5:'CLE',6:'DAL',7:'DEN',8:'DET',9:'GS',10:'HOU',11:'IND',12:'LAC',13:'LAL',14:'MIA',15:'MIL',16:'MIN',17:'BKN',18:'NY',19:'ORL',20:'PHI',21:'PHX',22:'POR',23:'SAC',24:'SA',25:'OKC',26:'UTAH',27:'WSH',28:'TOR',29:'MEM',30:'CHA'};
+const ESPN_SLOT = {0:'PG',1:'SG',2:'SF',3:'PF',4:'C',5:'G',6:'F',7:'SG/SF',8:'G/F',9:'PF/C',10:'F/C',11:'UTIL'};
+const SLEEPER_TEAM = {NOP:'NO', NYK:'NY', UTA:'UTAH', WAS:'WSH', GSW:'GS', SAS:'SA', PHO:'PHX'};
+const nmKey = x => String(x||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'').replace(/(jr|sr|ii|iii|iv)$/,'');
+const dayNum = d => Math.round((new Date(+d.slice(0,4),+d.slice(4,6)-1,+d.slice(6)) - new Date(+S_START().slice(0,4),+S_START().slice(4,6)-1,+S_START().slice(6)))/864e5)+1;
+const S_START = () => (S && S.settings.seasonStart) || DEFAULT_SETTINGS.seasonStart;
+const dateOfDay = n => { const b = S_START(), x = new Date(+b.slice(0,4),+b.slice(4,6)-1,+b.slice(6)); x.setDate(x.getDate()+n-1); return ymd(x); };
+/* a bigger, slim ESPN player list so deep rookies on Sleeper rosters still get real ESPN ids (and real stats) */
+async function extraPlayers(){
+  if (EXTRA_P) return EXTRA_P;
+  const Y = nbaSeasonYear(), f = {filterActive:{value:true}, sortDraftRanks:{sortPriority:100,sortAsc:true,value:'STANDARD'}, limit:1600};
+  try{ const list = await fetchJSON(`https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/${Y}/players?scoringPeriodId=0&view=players_wl`, {headers:{'X-Fantasy-Filter':JSON.stringify(f)}}, 20000);
+    EXTRA_P = {}; for (const p of list) EXTRA_P[nmKey(p.fullName)] = {id:String(p.id), name:p.fullName, team:ESPN_TEAM[p.proTeamId]||'FA', pos:(p.eligibleSlots||[]).filter(x=>x<=4).map(x=>ESPN_POS[x]).join('/')||'UTIL', rank:999};
+  }catch(e){ EXTRA_P = {}; }
+  return EXTRA_P;
+}
+async function sleeperPlayers(){ if (!SLEEPER_P) SLEEPER_P = await fetchJSON('https://api.sleeper.app/v1/players/nba', {}, 30000); return SLEEPER_P; }
+/* Read a league from Sleeper or ESPN into one common shape */
+async function fetchSource(src, opt={}){
+  if (src.src==='sleeper'){
+    const B = 'https://api.sleeper.app/v1/league/'+src.id;
+    const [L, R, U, P, st] = await Promise.all([fetchJSON(B), fetchJSON(B+'/rosters'), fetchJSON(B+'/users'), sleeperPlayers(), fetchJSON('https://api.sleeper.app/v1/state/nba')]);
+    const byName = {}; Object.values(POOL).forEach(p=>byName[nmKey(p.name)] = p);
+    const missing = R.flatMap(r=>r.players||[]).some(id=>P[id] && !byName[nmKey(P[id].full_name)]);
+    const extra = missing ? await extraPlayers() : {};
+    const map = {}, info = {};
+    const mapId = sid => { if (!sid || sid==='0') return null; if (map[sid]) return map[sid]; const q = P[sid]||{}, k = nmKey(q.full_name);
+      const hit = byName[k] || extra[k]; const id = hit ? hit.id : 's'+sid;
+      info[id] = {name: hit ? hit.name : (q.full_name||'Player '+sid), team: (hit&&hit.team) || SLEEPER_TEAM[q.team] || q.team || 'FA', pos: (hit&&hit.pos) || (q.fantasy_positions||[]).join('/') || 'UTIL', rank: (POOL[id]&&POOL[id].rank)||999};
+      return map[sid] = id; };
+    const regWeeks = Math.max(1, (L.settings.playoff_week_start||20)-1);
+    const weeks = opt.lineups ? [st.week] : Array.from({length:regWeeks},(_,i)=>i+1);
+    const M = {}; await Promise.all(weeks.map(w=>fetchJSON(B+'/matchups/'+w).then(x=>M[w]=x).catch(()=>{})));
+    const teams = R.sort((a,b)=>a.roster_id-b.roster_id).map(r=>{ const u = U.find(x=>x.user_id===r.owner_id)||{};
+      const ir = new Set(r.reserve||[]);
+      return {srcId:String(r.roster_id), name:(u.metadata&&u.metadata.team_name) || u.display_name || 'Team '+r.roster_id, owner:u.display_name||'',
+        players:(r.players||[]).map(id=>{ const m = mapId(id); return m && {id:m, ir:ir.has(id)}; }).filter(Boolean)}; });
+    const slots = L.roster_positions.filter(x=>x!=='BN' && x!=='IR'), bench = L.roster_positions.filter(x=>x==='BN').length;
+    const schedule = {};
+    for (const w in M){ const by = {}; (M[w]||[]).forEach(x=>{ if (x.matchup_id) (by[x.matchup_id] = by[x.matchup_id]||[]).push(String(x.roster_id)); }); schedule[w] = Object.values(by).filter(x=>x.length===2); }
+    // starters: Sleeper keeps one lineup per week (in roster-position order)
+    const lineups = {}; if (opt.lineups) for (const w in M) for (const x of (M[w]||[])) lineups[String(x.roster_id)] = (x.starters||[]).map(mapId);
+    return {name:L.name, dynasty: L.settings.type===2, keeper: L.settings.type===1, slots, rosterSize: slots.length+bench, irSlots: L.settings.reserve_slots||0,
+      regWeeks, playoffTeams: L.settings.playoff_teams||4, teams, schedule, info, weekLineups: lineups, curWeek: st.week};
+  }
+  // ESPN (league must be "viewable to public")
+  const Y = nbaSeasonYear(), B = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/${Y}/segments/0/leagues/${src.id}`;
+  const j = await fetchJSON(B+'?view=mTeam&view=mRoster&view=mSettings&view=mMatchup');
+  if (!j || !j.settings) throw new Error('ESPN league not readable — is "Make League Viewable to Public" on?');
+  const cnt = j.settings.rosterSettings.lineupSlotCounts, slots = [];
+  Object.keys(ESPN_SLOT).forEach(k=>{ for (let i=0;i<(cnt[k]||0);i++) slots.push(ESPN_SLOT[k]); });
+  const info = {};
+  const ent = e => { const pl = e.playerPoolEntry.player, id = String(e.playerId);
+    info[id] = {name:pl.fullName, team:ESPN_TEAM[pl.proTeamId]||'FA', pos:(pl.eligibleSlots||[]).filter(x=>x<=4).map(x=>ESPN_POS[x]).join('/')||'UTIL', rank:(POOL[id]&&POOL[id].rank)||999};
+    return {id, ir: e.lineupSlotId===13, slot:e.lineupSlotId}; };
+  const teams = j.teams.map(t=>({srcId:String(t.id), name:t.name || ((t.location||'')+' '+(t.nickname||'')).trim(), players:(t.roster&&t.roster.entries||[]).map(ent)}));
+  const ss = j.settings.scheduleSettings, regWeeks = ss.matchupPeriodCount||19, schedule = {};
+  (j.schedule||[]).forEach(m=>{ if (m.matchupPeriodId<=regWeeks && m.home && m.away) (schedule[m.matchupPeriodId] = schedule[m.matchupPeriodId]||[]).push([String(m.home.teamId), String(m.away.teamId)]); });
+  return {name:j.settings.name, dynasty:false, keeper:false, slots, rosterSize: slots.length+(cnt[12]||0), irSlots: cnt[13]||0, regWeeks, playoffTeams: ss.playoffTeamCount||4,
+    teams, schedule, info, espnBase:B, curDay: j.scoringPeriodId};
+}
+/* turn source lineup slots into our lineup array (index = our slot) */
+function espnLineup(entries, slots){
+  const out = slots.map(()=>null), used = new Set();
+  for (const e of entries){ const nm = ESPN_SLOT[e.lineupSlotId]; if (!nm) continue; const i = slots.findIndex((x,k)=>x===nm && !used.has(k)); if (i>=0){ out[i] = String(e.playerId); used.add(i); } }
+  return out;
+}
+async function buildFromSource(){
+  BUILDING = true; BUILD_ERR = '';
+  try{
+    const src = LDEF.mirror || LDEF.seed, X = await fetchSource(src);
+    const teams = {}, rosters = {}, ids = [], tid = {};
+    X.teams.forEach((T,i)=>{ const t = 't'+i; ids.push(t); tid[T.srcId] = t;
+      teams[t] = {name:T.name, src:T.srcId}; rosters[t] = {};
+      T.players.forEach(pl=>{ rosters[t][pl.id] = {...snap({...X.info[pl.id], id:pl.id}), ...(pl.ir?{ir:true}:{}), rnd:1}; }); });
+    const schedule = {};
+    if (LDEF.mirror) for (const w in X.schedule) schedule['w'+w] = X.schedule[w].map(([a,b])=>[tid[a],tid[b]]).filter(p=>p[0]&&p[1]);
+    const settings = {...DEFAULT_SETTINGS, name: LDEF.mirror ? X.name+' (mirror)' : X.name+' — our rules', numTeams: ids.length,
+      rosterSize: Math.max(X.rosterSize, ...X.teams.map(T=>T.players.filter(x=>!x.ir).length)), irSlots: Math.max(X.irSlots, ...X.teams.map(T=>T.players.filter(x=>x.ir).length)), slots: X.slots, statsMode:'live', teamStarts:-1,
+      leagueType: X.dynasty ? 'dynasty' : X.keeper ? 'keeper' : 'redraft', regWeeks: X.regWeeks, playoffTeams: Math.min(4, X.playoffTeams),
+      addsPerWeek: LDEF.mirror ? 0 : DEFAULT_SETTINGS.addsPerWeek,
+      mirror: LDEF.mirror ? {...LDEF.mirror} : null, seededFrom: LDEF.seed ? {...LDEF.seed, at: Date.now()} : null};
+    await Store.replace({settings, teams, rosters, lineups:{}, trades:{}, log:{}, draft:{status:'done', order:ids, picks:{}}, schedule, created:Date.now()}, 'copy league');
+    if (LDEF.mirror) setTimeout(()=>syncMirror(true), 1500);
+  }catch(e){ console.warn(e); BUILD_ERR = e.message||String(e); }
+  BUILDING = false; render();
+}
+/* keep a mirror in step with the real league: rosters, names, lineups (day by day), matchups */
+let SYNCING = false;
+async function syncMirror(force){
+  if (!S || !S.settings.mirror || SYNCING) return;
+  const last = (S.sync && S.sync.at) || 0;
+  if (!force && Date.now()-last < 5*60e3) return;
+  if (!(await Store.lock('mirror-sync', 90000))) return;
+  SYNCING = true;
+  try{
+    const src = S.settings.mirror, X = await fetchSource(src, {lineups:true}), u = {}, tid = {};
+    teamIds().forEach(t=>{ tid[S.teams[t].src] = t; });
+    const moves = [];
+    for (const T of X.teams){ const t = tid[T.srcId]; if (!t) continue;
+      if (T.name && T.name!==S.teams[t].name) u['teams/'+t+'/name'] = T.name;
+      const now = new Set(T.players.map(x=>x.id)), had = S.rosters[t]||{};
+      for (const pid in had) if (!now.has(pid)){ u['rosters/'+t+'/'+pid] = null; moves.push(`${T.name} dropped ${had[pid].name}`); }
+      for (const pl of T.players){ const was = had[pl.id];
+        if (!was){ u['rosters/'+t+'/'+pl.id] = {...snap({...X.info[pl.id], id:pl.id}), ...(pl.ir?{ir:true}:{})}; moves.push(`${T.name} added ${X.info[pl.id].name}`); }
+        else if (!!was.ir !== !!pl.ir) u['rosters/'+t+'/'+pl.id+'/ir'] = pl.ir || null; }
+    }
+    // lineups: write every day from the last finished day up to today
+    const today = todayStr(), through = (S.sync && S.sync.through) || dateOfDay(0);
+    const days = []; for (let n = Math.max(1, dayNum(through)+1); n <= dayNum(today); n++) days.push(dateOfDay(n));
+    if (src.src==='espn'){
+      for (const d of days.slice(-40)){ const n = dayNum(d);
+        const r = await fetchJSON(X.espnBase+'?view=mRoster&scoringPeriodId='+n).catch(()=>null); if (!r || !r.teams) continue;
+        for (const T of r.teams){ const t = tid[String(T.id)]; if (!t) continue; u['lineups/'+t+'/d'+d] = luObj(espnLineup(T.roster.entries, S.settings.slots)); } }
+    } else {
+      for (const d of days.filter(x=>weekOfDate(x)===X.curWeek)) for (const sid in X.weekLineups){ const t = tid[sid]; if (t) u['lineups/'+t+'/d'+d] = luObj(X.weekLineups[sid]); }
+      for (const w in X.schedule) u['schedule/w'+w] = X.schedule[w].map(([a,b])=>[tid[a],tid[b]]).filter(p=>p[0]&&p[1]);
+    }
+    if (moves.length) u['log/'+Date.now()] = {ts:Date.now(), text:'Synced from '+src.src.toUpperCase()+': '+moves.slice(0,12).join(' · ')+(moves.length>12?` (+${moves.length-12} more)`:'')};
+    u['sync'] = {at:Date.now(), through: days.length ? (dayNum(today)>1 ? dateOfDay(dayNum(today)-1) : through) : through, moves: moves.length};
+    Store.update(u);
+  }catch(e){ console.warn('mirror sync failed', e); toast('Could not sync from '+S.settings.mirror.src.toUpperCase()+': '+(e.message||e)); }
+  SYNCING = false;
+}
+setInterval(()=>syncMirror(false), 5*60e3);
+['addPlayer','dropPlayer','moveToIR','activateIR','setSlot','autoSet','startActive','proposeTrade'].forEach(n=>{ const f = window[n]; if (typeof f!=='function') return;
+  window[n] = function(...a){ if (MIRROR()) return toast('This league mirrors '+S.settings.mirror.src.toUpperCase()+' — make moves there and they copy over here.'); return f.apply(this,a); }; });
+function mirrorBanner(){
+  if (!MIRROR()) return '';
+  const m = S.settings.mirror, at = S.sync && S.sync.at;
+  return `<div class="banner" style="margin-bottom:14px">🔁 <b>Mirror of ${m.src==='espn'?'ESPN':'Sleeper'} league</b> — read-only. Rosters, moves, ${m.src==='espn'?'daily':'weekly'} lineups and matchups copy over automatically and are scored with our rules: best <b>${S.settings.gameCap>=99?'(all)':S.settings.gameCap}</b> games per player${teamLimit()?`, <b>${teamLimit()}</b> team starts a week`:''}. Make real moves in ${m.src==='espn'?'ESPN':'Sleeper'}.
+    <span class="muted small">Last sync: ${at?new Date(at).toLocaleString([], {month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}):'never'}</span> <button class="btn sm" onclick="syncMirror(true)">Sync now</button></div>`;
 }
 function setSlot(t,d,i,pid){
   const lu = lineupForDay(t,d).slice(), j = pid ? lu.indexOf(pid) : -1;
@@ -1524,7 +1746,7 @@ function vSettings(){
   </div><div>
   <div class="card"><h3 style="margin-top:0">Games-played limit</h3><table>
     ${row('Games that count per player, per week', sel('gameCap', [...range(1,7).map(n=>[n,n===3?'3 (best 3)':String(n)]), [99,'No limit']], true), "Each player's best N started games count")}
-    ${row('Team starts per week', sel('teamStarts', [[0,'No team limit'], ...range(10,70).map(n=>[n,String(n)])], true), "Stops pickup spam. A game uses a team start only if it adds to your total — a maxed player swapping in a better game is free. Once a team's starts are used up, new pickups can't add games.")}
+    ${row('Team starts per week', sel('teamStarts', [[-1,`Auto: ${s.slots.length} starters × ${s.gameCap>=99?'∞':s.gameCap} = ${s.gameCap>=99?'no limit':s.slots.length*s.gameCap}`], [0,'No team limit'], ...range(10,70).map(n=>[n,String(n)])], true), "Stops pickup spam. A game uses a team start only if it adds to your total — a maxed player swapping in a better game is free. Once a team's starts are used up, new pickups can't add games.")}
   </table></div>
   <div class="card"><h3 style="margin-top:0">Scoring</h3><table>
     ${Object.keys(STAT_LABELS).map(k=>row(`${STAT_LABELS[k]} (${k})`, `<input type="number" step="0.5" style="width:80px" ${dis} value="${s.scoring[k]||0}" onchange="Store.update({['settings/scoring/${k}']:+this.value||null})">`)).join('')}
@@ -1562,7 +1784,7 @@ function vLeague(){
   <div class="grid2">
   <div class="card"><h3>Your team</h3><div class="row"><input id="tn" value="${esc(tName(ME))}"><button class="btn" onclick="Store.update({['teams/'+ME+'/name']:$('#tn').value||tName(ME)})">Rename</button></div>
     <h3>Scoring (H2H points)</h3><table>${Object.keys(STAT_LABELS).filter(k=>s.scoring[k]).map(k=>`<tr><td>${STAT_LABELS[k]}</td><td class="num"><b>${s.scoring[k]>0?'+':''}${s.scoring[k]}</b></td></tr>`).join('')}</table>
-    <p class="muted small">Rule: each starter's best <b>${s.gameCap>=99?'(no limit)':s.gameCap}</b> games per week count${+s.teamStarts?`, up to <b>${s.teamStarts}</b> team starts per week`:''}. Lineup: ${s.slots.join(', ')} + ${s.rosterSize-s.slots.length} bench + ${s.irSlots} IR. <a href="#" onclick="go('settings');return false">All settings →</a></p>
+    <p class="muted small">Rule: each starter's best <b>${s.gameCap>=99?'(no limit)':s.gameCap}</b> games per week count${teamLimit()?`, up to <b>${teamLimit()}</b> team starts per week`:''}. Lineup: ${s.slots.join(', ')} + ${s.rosterSize-s.slots.length} bench + ${s.irSlots} IR. <a href="#" onclick="go('settings');return false">All settings →</a></p>
     <h3>League type · ${esc(s.season)}</h3><p><b>${esc(LEAGUE_TYPES[s.leagueType])}</b></p>
     <p class="muted small">${s.leagueType==='keeper'?`Each team keeps up to ${s.keepers} players (pick them on My Team). ${s.keeperCost==='round'?'A keeper costs the pick in the round he was drafted; free-agent pickups cost a last-round pick.':'Keepers cost your last-round picks.'}`:s.leagueType==='dynasty'?`Teams keep everyone. Each new season starts with a ${s.rookieRounds}-round rookie/free-agent draft, worst record picks first.`:'Everyone redrafts from scratch each season.'}</p>
     ${Object.keys(S.history).length?`<h3>League history</h3><table>${Object.values(S.history).sort((a,b)=>b.ts-a.ts).map(h=>`<tr><td>${esc(h.season)}</td><td>🏆 <b>${esc(h.champion)}</b></td><td class="small muted">${(h.standings||[]).slice(0,3).map(x=>`${esc(x.team)} ${x.w}-${x.l}`).join(' · ')}</td></tr>`).join('')}</table>`:''}</div>
@@ -1571,7 +1793,7 @@ function vLeague(){
     ${cm?`<p class="small muted">Stats source</p><div class="row"><select onchange="Store.update({'settings/statsMode':this.value})"><option value="sim" ${isSim()?'selected':''}>Simulated (demo / preseason)</option><option value="live" ${!isSim()?'selected':''}>Live ESPN box scores</option></select></div>
       ${isSim()?`<p class="small muted">Sim clock: <b>${esc(simStatus())}</b> — move it in the <a href="#" onclick="go('sim');return false">Sim Lab</a>.</p>`:''}
       <h3>Season</h3><p class="small muted">League type and every other rule live on the <a href="#" onclick="go('settings');return false">Settings</a> tab.</p>      <div class="row" style="margin-top:8px"><button class="btn" onclick="seasonModal()">Start next season (${esc(nextSeasonLabel(s.season))})…</button></div>
-      <h3>Team names</h3>${teamIds().map(t=>`<div class="row" style="margin:3px 0"><input value="${esc(tName(t))}" onchange="Store.update({['teams/${t}/name']:this.value})"></div>`).join('')}
+      <h3>Team names</h3>${teamIds().map(t=>`<div class="row" style="margin:3px 0"><input value="${esc(tName(t))}" onchange="Store.update({['teams/${t}/name']:this.value})">${LOGIN()?(S.teams[t].pin?`<button class="btn sm" onclick="resetPin('${t}')">Reset PIN</button>`:'<span class="muted small">no PIN yet</span>'):''}</div>`).join('')}
       <h3>Backups</h3><p class="small muted">${STORE_MODE==='firebase'?'The league saves online after every change. On top of that, a checkpoint is saved every 12 hours and before any big change (restore, delete, auto-draft, trades), and each device keeps its own copy.':'Sandbox mode — saved in this browser only.'}</p>
       <div class="row"><button class="btn" onclick="downloadBackup()">Download backup file</button><label class="btn">Restore from file<input type="file" accept=".json" style="display:none" onchange="restoreFromFile(this)"></label>
       ${STORE_MODE==='firebase'?`<button class="btn" onclick="checkpoint('Manual checkpoint',true).then(loadCheckpoints)">Save checkpoint now</button><button class="btn" onclick="loadCheckpoints()">Show checkpoints</button>`:''}</div>
@@ -1661,7 +1883,7 @@ function mockToLeague(){
   const teams = {}, rosters = {}, picks = {}, order = [];
   for (let i=0;i<MOCK.N;i++){ teams['t'+i] = {name: mockTeamName(i)}; rosters['t'+i] = {}; order.push('t'+i); }
   MOCK.picks.forEach((pid,n)=>{ const t='t'+mockTeamAt(n); rosters[t][pid] = {...snap(pInfo(pid)), rnd: Math.floor(n/MOCK.N)+1}; picks[n] = {team:t, pid, ts:Date.now()}; });
-  ME = 't'+mockMine(); lsSet('b3h_me', ME);
+  ME = 't'+mockMine(); lsSet(lk('b3h_me'), ME);
   Store.replace({settings:{...DEFAULT_SETTINGS, name:'Test League (from mock)', numTeams:MOCK.N, rosterSize:MOCK.rounds}, teams, rosters, lineups:{}, trades:{}, log:{x:{ts:Date.now(),text:'Test league created from a mock draft'}}, draft:{status:'done', order, picks}, created:Date.now()});
   go('matchup');
 }
@@ -1862,7 +2084,7 @@ function renderCalc(){
 }
 function quickTest(){ if (S.draft.status==='pre') S.draft.order = S.draft.order; simRestOfDraft(); Store.update({'draft/status':'done','settings/statsMode':'sim','settings/simWeek':2,'settings/simDay':3}); go('matchup'); }
 
-$('#meSel').addEventListener('change', e=>{ ME=e.target.value; lsSet('b3h_me',ME); ui.tradeGive.clear(); ui.tradeGet.clear(); ui.teamView=null; render(); });
+$('#meSel').addEventListener('change', e=>{ ME=e.target.value; lsSet(lk('b3h_me'),ME); ui.tradeGive.clear(); ui.tradeGet.clear(); ui.teamView=null; render(); });
 
 (async()=>{ await Promise.all([loadPool(), loadSchedule()]); await Store.init(); if (DEMO && MOCK && lsGet('b3h_pending_mock')==='1' && MOCK.picks.length>=mockTotal()) mockToLeague(); if (MOCK) mockTick(); })();
 </script>

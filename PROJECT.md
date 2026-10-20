@@ -4,7 +4,7 @@ Fantasy basketball site where **each starter's best 3 games per week count** (th
 
 - **Live URL (after upload):** https://lgw2222.github.io/best3-hoops/
 - **Sandbox (private test league, this device only):** https://lgw2222.github.io/best3-hoops/?demo=1
-- **Version:** v1.3 (2026-10-15) — team start limit per week (settings.teamStarts, 0 = off; a game uses a start only if it adds to the total, maxed players swap better games in free), waivers default 2 days. v1.2: My Team Schedule / Stats / Both toggle (Mon–Sun opponent grid, last 7/15/30 stat windows), no-game-day banner. v1.1: real NBA schedule preloaded
+- **Version:** v1.5 (2026-10-20) — multiple leagues on one site (switcher in the header, `?league=<id>`): main; `dyn` = copy of Sleeper "The New Dynasty League" rosters, run here with our rules; read-only mirrors `m-dyn`, `m-other` (Sleeper 1402115472383549440), `m-espn` (ESPN 199278, must stay "viewable to public"). Mirrors sync rosters/adds/drops/IR, lineups (ESPN daily via mRoster&scoringPeriodId, Sleeper weekly starters recorded per day), matchups, every 5 min while open. Sleeper players matched to ESPN ids by name (fallback: ESPN players_wl list). Team start limit default = auto (starters × games per player). v1.4 (2026-10-16) — team login with per-team PIN (teams/tX/pin hash; only on the online league, sandbox keeps the team switcher), read-only view of other teams, commish can reset PINs; My Team: clicking a name opens the player card, separate Swap menu. v1.3: team start limit per week (settings.teamStarts, 0 = off; a game uses a start only if it adds to the total, maxed players swap better games in free), waivers default 2 days. v1.2: My Team Schedule / Stats / Both toggle (Mon–Sun opponent grid, last 7/15/30 stat windows), no-game-day banner. v1.1: real NBA schedule preloaded
 
 ## Files
 | File | What it is |
@@ -42,3 +42,16 @@ Draft room (clock, auto-pick, manual order), Mock Draft vs CPU, daily lineups + 
 - Team logins (each manager claims a team) instead of "Acting as".
 - Push notifications (lineup reminders, waiver results).
 - Verify ESPN last-7/15/30 splits and +/- once the season starts (Oct 20).
+
+
+## Leagues (v1.5)
+| id | what | source |
+|---|---|---|
+| main | Best of 3 Hoops (our league) | — |
+| dyn | Dynasty, our rules — rosters copied once, then managed here (login, own matchups) | Sleeper 1416329086271320064 |
+| m-dyn | Mirror (read-only) | Sleeper 1416329086271320064 |
+| m-other | Mirror (read-only) | Sleeper 1402115472383549440 |
+| m-espn | Mirror (read-only) | ESPN fba 199278 |
+
+APIs (all readable from lgw2222.github.io): api.sleeper.app/v1/league/{id}[/rosters|/users|/matchups/{w}], /v1/state/nba, /v1/players/nba (~2.5MB, memory only); ESPN lm-api-reads .../segments/0/leagues/199278?view=mTeam&view=mRoster&view=mSettings&view=mMatchup, daily lineups with &scoringPeriodId=N (day 1 = 2026-10-20). ESPN lineupSlotId: 0 PG 1 SG 2 SF 3 PF 4 C 5 G 6 F 11 UTIL 12 BE 13 IR.
+Known limits: Sleeper only exposes the current week's starters, so a day's lineup is recorded when someone has the site open; mirrors cap playoffs at 4 teams (Sleeper leagues use 6).
