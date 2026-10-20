@@ -63,6 +63,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-
 #ticker .tk span b{color:#fff}
 @keyframes tick{to{transform:translateX(-100%)}}
 #lgSel{max-width:230px;font-weight:700}
+select:disabled,input:disabled{opacity:.55;cursor:not-allowed}
 #who{display:flex;align-items:center;gap:10px}
 #who .who{display:flex;align-items:center;gap:8px;font-size:13px;line-height:1.15}
 #who .lbl{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
@@ -1931,7 +1932,7 @@ function vSettings(){
   const row = (label, ctl, note) => `<tr><td style="white-space:normal;min-width:0">${label}${note?`<div class="small muted" style="white-space:normal">${note}</div>`:''}</td><td class="num" style="white-space:normal">${ctl}</td></tr>`;
   const range = (a,b) => Array.from({length:b-a+1},(_,i)=>a+i);
   const dateIn = (k) => `<input type="date" ${dis} value="${s[k]?s[k].slice(0,4)+'-'+s[k].slice(4,6)+'-'+s[k].slice(6):''}" onchange="setS('${k}',this.value.replace(/-/g,''))">`;
-  return `<h2>Settings</h2>${cm?'<p class="muted small">You\'re the commissioner — changes save for the whole league immediately.</p>':'<div class="banner" style="font-weight:600">View only. The commissioner can change these (League tab → Commissioner mode).</div>'}
+  return `<h2>Settings</h2>${cm?'<p class="muted small">You\'re the commissioner — changes save for the whole league immediately.</p>':`<div class="banner row" style="font-weight:600;justify-content:space-between;gap:10px">${MIRROR()?'These are this mirror\'s scoring rules. Only the commissioner can change them.':'View only — only the commissioner can change settings.'} <button class="btn pri sm" onclick="toggleCommish(true)">${STORE_MODE==='firebase'&&!S.settings.commishPin?'Become commissioner (set a PIN)':'Unlock — enter commissioner PIN'}</button></div>`}
   <div class="grid2"><div>
   <div class="card"><h3 style="margin-top:0">Basic</h3><table>
     ${row('League name', `<input ${dis} value="${esc(s.name)}" onchange="setS('name',this.value)">`)}
