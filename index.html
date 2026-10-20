@@ -63,6 +63,63 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-
 #ticker .tk span b{color:#fff}
 @keyframes tick{to{transform:translateX(-100%)}}
 #lgSel{max-width:230px;font-weight:700}
+.moretab{display:none!important}
+#tabs .ts{display:none}
+.pc-x{position:absolute;top:14px;right:14px;z-index:2}
+.moregrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.moregrid button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 6px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);font:700 12px Inter,sans-serif;cursor:pointer;text-align:center}
+.moregrid button.on{border-color:rgba(255,122,26,.6);background:rgba(255,122,26,.12)}
+.moregrid svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.moretab svg{fill:currentColor;stroke:none}
+.mu .tm span.av{display:grid}
+.sb{max-width:980px;margin-left:auto;margin-right:auto}
+#modalBody{position:relative}
+@media(max-width:900px){
+  #tabs .xtab{display:none}
+  #tabs .tl{display:none} #tabs .ts{display:inline} #tabs .moretab span{display:inline}
+  .moretab{display:flex!important}
+  #tabs{justify-content:space-around;overflow:visible}
+  #tabs button{flex:1;min-width:0;padding:8px 4px}
+  #tabs button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+}
+@media(max-width:700px){
+  #ticker{order:9;flex:1 0 100%;font-size:11.5px}
+  .mu{grid-template-columns:1fr 1fr;row-gap:6px}
+  .mu .tm{font-size:13px}
+  .mu .s{grid-column:1/-1;grid-row:2;text-align:center;font-size:40px}
+  .mu .r{grid-column:2;grid-row:1}
+  .btn.sm{min-height:34px}
+  .sb .pos{font-size:10px}
+  #modal .card{max-height:88vh;overflow-y:auto}
+}
+.sb{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;cursor:default}
+.sb-days{margin-bottom:8px}
+.sb-head,.sb-row{display:grid;grid-template-columns:minmax(0,1fr) 54px 46px 54px minmax(0,1fr);align-items:center;gap:6px}
+.sb-head{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);padding:4px 0 6px;border-bottom:1px solid var(--line)}
+.sb-head span:nth-child(2),.sb-head span:nth-child(4){text-align:center}
+.sb-head span:last-child{text-align:right}
+.sb-row{padding:8px 0;border-bottom:1px solid var(--line)}
+.sb-p{min-width:0}
+.sb-p.r{text-align:right}
+.sb-p a.pl{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0}
+.sb-p a.pl b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-sub{font-size:11.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.sb-chips{display:block;margin-top:3px}
+.sb-chips .chip{font-size:10.5px;padding:1px 5px;margin:0 2px 0 0}
+.sb-p.r .sb-chips .chip{margin:0 0 0 2px}
+.sb-pts{text-align:center;font-weight:800;font-variant-numeric:tabular-nums}
+.sb-pts.win{color:var(--good)}
+.sb-slot{text-align:center}
+.sb-sec{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--acc2);margin:14px 0 2px}
+.sb-tot{border-bottom:0;font-size:15px}
+@media(max-width:700px){
+  .sb-head,.sb-row{grid-template-columns:minmax(0,1fr) 40px 34px 40px minmax(0,1fr);gap:4px}
+  .sb-p a.pl img,.sb-p a.pl .av{width:22px;height:22px}
+  .sb-p a.pl b{font-size:12.5px}
+  .sb-sub{font-size:10.5px}
+  .sb-pts{font-size:13px}
+  .sb .pos{font-size:9.5px;padding:2px 4px}
+}
 .hstrip{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 2px 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .hstrip::-webkit-scrollbar{display:none}
 .hcard{flex:0 0 min(320px,82vw);scroll-snap-align:start;text-align:left;padding:0;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--panel);color:inherit;font:inherit;cursor:pointer;transition:transform .3s var(--spring),box-shadow .3s}
@@ -1219,6 +1276,12 @@ document.addEventListener('keydown', e=>{ if (e.key==='Escape' && ui.mv){ ui.mv=
 
 const TABS_ALERTS = ['alerts','Alerts'];
 const TABS = [['matchup','Scoreboard'],['cast','FantasyCast'],['team','My Team'],['players','Players'],['draft','Draft'],['mock','Mock Draft'],['sim','Sim Lab'],['trades','Trades'],['standings','Standings'],['cup','Tri-Cup'],['alerts','Alerts'],['settings','Settings'],['league','League']];
+function openMore(){
+  const TB = TABS.filter(([k])=>!(MIRROR() && (k==='draft'||k==='sim')) && !['matchup','team','players','cast'].includes(k));
+  openModal(`<div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">More</h3><button class="btn sm" onclick="closeModal()">✕</button></div>
+    <div class="moregrid">${TB.map(([k,l])=>`<button class="${ui.tab===k?'on':''}" onclick="closeModal();go('${k}')">${icon(k)}<span>${l}</span></button>`).join('')}
+    <button onclick="closeModal();switchLeague('home')">${icon('matchup')}<span>Home · all leagues</span></button></div>`);
+}
 function go(t){ ui.tab=t; ui.anim=true; lsSet('b3h_tab',t); render(); window.scrollTo({top:0,behavior:'smooth'}); }
 const ICONS = {
   matchup:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>', cast:'<circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/>',
@@ -1279,7 +1342,11 @@ function render(){
   $('#who').innerHTML = LOGIN() ? `<span class="who">${tAv(ME)}<span><span class="lbl">Signed in as</span><br><b>${esc(tName(ME))}</b>${isCommish()?' <span class="tag" style="margin-left:4px">Commish</span>':''}</span></span><button class="btn sm" onclick="logout()">Log out</button>` : '';
   $('#meSel').innerHTML = teamIds().map(t=>`<option value="${t}" ${t===ME?'selected':''}>${esc(tName(t))}</option>`).join('');
   paintTag();
-  $('#tabs').innerHTML = TABS.filter(([k])=>!(MIRROR() && (k==='draft'||k==='sim'))).map(([k,l])=>`<button class="${ui.tab===k?'on':''}" onclick="go('${k}')">${icon(k)}<span>${l}</span></button>`).join('');
+  const TB = TABS.filter(([k])=>!(MIRROR() && (k==='draft'||k==='sim')));
+  const MAIN4 = ['matchup','team','players','cast'], inMore = !MAIN4.includes(ui.tab);
+  const SHORT = {matchup:'Scores', cast:'Live', team:'My Team', players:'Players'};
+  $('#tabs').innerHTML = TB.map(([k,l])=>`<button class="${ui.tab===k?'on':''} ${MAIN4.includes(k)?'':'xtab'}" onclick="go('${k}')">${icon(k)}<span class="tl">${l}</span>${SHORT[k]?`<span class="ts">${SHORT[k]}</span>`:''}</button>`).join('')
+    + `<button class="moretab ${inMore?'on':''}" onclick="openMore()"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>${inMore ? esc((TB.find(x=>x[0]===ui.tab)||[,'More'])[1]) : 'More'}</span></button>`;
   const w = ui.week||curWeek();
   if (!isSim()){ const key=w+'|'+todayStr(); if(key!==lastLiveReq){ lastLiveReq=key; loadLiveWeek(w); } }
   if (S.draft.status==='done' && Date.now()-lastProc > 30000) setTimeout(()=>processPending(false), 0);
@@ -1348,8 +1415,40 @@ function vMatchup(){
     h += `<div class="card">${m.label?`<div class="small" style="color:var(--acc2);font-weight:800;margin-bottom:6px">${esc(m.label)}${m.total&&playoffRounds().some(r=>r.weeks.length>1&&r.weeks.includes(w))?` · round total ${fmt(m.total[0])} – ${fmt(m.total[1])}`:''}</div>`:''}<div class="mu" onclick="ui.open=(ui.open==='${key}'?'none':'${key}');render()">
       <div class="tm">${tAv(a)}<span>${esc(tName(a))}</span></div><div class="s"><span class="${A.total>B.total?'win':''}" data-count="${A.total}">${fmt(A.total)}</span> <span class="muted">–</span> <span class="${B.total>A.total?'win':''}" data-count="${B.total}">${fmt(B.total)}</span></div><div class="r"><div class="tm">${tAv(b)}<span>${esc(tName(b))}</span></div></div></div>
       ${(()=>{ const tot = A.total+B.total, pa = tot ? A.total/tot*100 : 50; return `<div class="wbar" title="Share of points scored this week"><i style="width:${pa}%"></i><i style="width:${100-pa}%"></i></div><div class="wlab"><span>${esc(tName(a))} ${Math.round(pa)}%</span><span>${Math.round(100-pa)}% ${esc(tName(b))}</span></div>`; })()}
-      ${open?`<div class="grid2" style="margin-top:12px">${detail(A)}${detail(B)}</div>`:''}</div>`;
+      ${open?sideBySide(a,b,w,A,B):''}</div>`;
   }
+  return h;
+}
+/* ESPN-app style matchup: both lineups side by side, one row per lineup spot */
+function sideBySide(a,b,w,A,B){
+  const ds = weekDates(w), today = todayStr();
+  const d = ui.mday && ds.includes(ui.mday) ? ui.mday : (ds.includes(today) ? today : (today < ds[0] ? ds[0] : ds[ds.length-1]));
+  const LA = lineupForDay(a,d), LB = lineupForDay(b,d), slots = S.settings.slots;
+  const rowA = pid => A.rows.find(r=>r.pid===pid), rowB = pid => B.rows.find(r=>r.pid===pid);
+  const info = pid => {
+    if (!pid) return '';
+    if (!plays(pid,d)) return '<span class="muted">No game</span>';
+    const g = gameOn(pid,d), opp = esc(oppOn(pid,d)||'');
+    if (g) return `<b style="color:var(--text)">${fmt(fpts(g.line))}</b> FP ${opp}`;
+    const f = fullGame(pInfo(pid).team,d);
+    return `${opp}${f?' · '+new Date(f.tip).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):''}`;
+  };
+  const chips = r => r && r.games.length ? `<span class="sb-chips">${r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" title="${dayName(g.date)} ${esc(g.opp||'')}">${fmt(g.fp)}</span>`).join('')}</span>` : '';
+  const side = (pid, r, right) => !pid ? `<div class="sb-p ${right?'r':''}"><span class="muted">Empty</span></div>` :
+    `<div class="sb-p ${right?'r':''}"><a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${right?'':pImg(pid)}<b>${esc(pInfo(pid).name)}</b>${right?pImg(pid):''}</a>
+      <div class="sb-sub">${esc(pInfo(pid).team)} · ${info(pid)}</div>${chips(r)}</div>`;
+  const pts = (r, other) => { const v = r ? r.pts : 0, o = other ? other.pts : 0; return `<div class="sb-pts ${v>o?'win':''}">${r?fmt(v):'—'}</div>`; };
+  const row = (sl, pa, pb) => { const ra = pa && rowA(pa), rb = pb && rowB(pb);
+    return `<div class="sb-row">${side(pa, ra, false)}${pts(ra, rb)}<div class="sb-slot"><span class="pos">${esc(sl)}</span></div>${pts(rb, ra)}${side(pb, rb, true)}</div>`; };
+  let h = `<div class="sb" onclick="event.stopPropagation()">
+    <div class="row days sb-days">${ds.map(x=>`<button class="btn sm ${x===d?'pri':''}" onclick="event.stopPropagation();ui.mday='${x}';render()">${dayName(x)} ${+x.slice(4,6)}/${+x.slice(6)}</button>`).join('')}</div>
+    <div class="sb-head"><span>${esc(tName(a))}</span><span>Week pts</span><span></span><span>Week pts</span><span>${esc(tName(b))}</span></div>`;
+  slots.forEach((sl,i)=>{ h += row(sl, LA[i], LB[i]); });
+  // bench: rostered players not in that day's lineup, plus anyone who scored earlier in the week
+  const benchOf = (t, L, T) => { const inL = new Set(L.filter(Boolean)); const ids = new Set([...rosterIds(t).filter(p=>!inL.has(p)), ...T.rows.filter(r=>!inL.has(r.pid)).map(r=>r.pid)]); return [...ids].sort((x,y)=>((T.rows.find(r=>r.pid===y)||{}).pts||0)-((T.rows.find(r=>r.pid===x)||{}).pts||0)); };
+  const BA = benchOf(a, LA, A), BB = benchOf(b, LB, B), n = Math.max(BA.length, BB.length);
+  if (n){ h += `<div class="sb-sec">Bench</div>`; for (let i=0;i<n;i++) h += row('BE', BA[i], BB[i]); }
+  h += `<div class="sb-row sb-tot"><div class="sb-p"><b>Total</b></div><div class="sb-pts ${A.total>B.total?'win':''}">${fmt(A.total)}</div><div class="sb-slot"></div><div class="sb-pts ${B.total>A.total?'win':''}">${fmt(B.total)}</div><div class="sb-p r"><b>Total</b></div></div></div>`;
   return h;
 }
 function detail(T){
@@ -1632,7 +1731,7 @@ async function cupLoad(force){
     }
     CUP.data = data; CUP.at = Date.now();
   }catch(e){ console.warn('tri-cup load', e); CUP.data = CUP.data || {}; CUP.links = CUP.links || {}; }
-  CUP.loading = false; if (ui.tab==='cup') render();
+  CUP.loading = false; if (ui.tab==='cup') setTimeout(render, 0);
 }
 function cupSave(path, val){
   CUP.links = CUP.links || {}; setPath(CUP.links, path, val);
@@ -1665,7 +1764,7 @@ function vCup(){
     ${mode==='real'?'<b>Real</b> = the actual records in Sleeper and ESPN.':'<b>Best-3</b> = every league re-scored with our rules (best '+S.settings.gameCap+' games per player), using the real matchups.'}</p>
     ${missing.length?`<div class="banner">Not loaded yet: ${missing.map(x=>esc(CUP_LG_NAME[x])).join(', ')}. Open ${missing.length>1?'each one':'it'} once in the league switcher so it copies over. ${missing.map(x=>`<a href="#" onclick="switchLeague('${x}');return false">Open ${esc(CUP_LG_NAME[x])} →</a>`).join(' ')}</div>`:''}
     <div class="card tw"><table><tr><th>#</th><th>Manager</th><th class="num">W</th><th class="num">L</th><th class="num">T</th><th class="num">Win %</th><th class="num">${mode==='real'?'Points (league scoring)':'Points (our scoring)'}</th><th>By league</th></tr>
-    ${rows.map((p,i)=>`<tr><td><b>${i===0&&p.w?'🏆':i+1}</b></td><td><b>${esc(p.name)}</b> <span class="muted small">${p.by.length} league${p.by.length===1?'':'s'}</span></td>
+    ${rows.length?'':`<tr><td colspan="8" class="muted" style="text-align:center;padding:22px">No managers yet — open the three real leagues once and their records show up here.</td></tr>`}${rows.map((p,i)=>`<tr><td><b>${i===0&&p.w?'🏆':i+1}</b></td><td><b>${esc(p.name)}</b> <span class="muted small">${p.by.length} league${p.by.length===1?'':'s'}</span></td>
       <td class="num"><b>${p.w}</b></td><td class="num">${p.l}</td><td class="num">${p.t}</td><td class="num">${(p.pct*100).toFixed(1)}%</td><td class="num">${fmt(p.pf)}</td>
       <td>${p.by.map(b=>`<span class="chip" title="${esc(b.team)}">${esc(CUP_LG_NAME[b.lg])} ${b.w}-${b.l}${b.t?'-'+b.t:''}</span>`).join(' ')}</td></tr>`).join('')}</table></div>
     <p class="muted small">Records update whenever a league syncs (open it, or hit Sync now). Best-3 records count finished weeks only.</p>`;
@@ -2279,7 +2378,7 @@ function drawPlayer(pid, live){
   const html = `<div class="row" style="justify-content:space-between;align-items:flex-start"><div class="pc-head">${headshot}
       <div><div style="font-size:22px;font-weight:900">${esc(p.name)}</div><div class="muted">${esc(p.team)} · <span class="pos">${esc(p.pos)}</span>${p.rank&&p.rank<700?` · ESPN rank #${p.rank}`:''}${p.adp?` · ADP ${p.adp}`:''}${p.own!=null?` · ${fmt(p.own)}% rostered ${p.ownChg!=null?'('+trendCell(p)+')':''}`:''}</div>
       <div class="small" style="margin-top:4px">${p.inj?`<span class="inj">${esc(p.inj.toUpperCase())}</span> `:''}${status}</div></div></div>
-      <button class="btn sm" onclick="closeModal()">✕</button></div>
+      <button class="btn sm pc-x" onclick="closeModal()" aria-label="Close">✕</button></div>
     <div class="row" style="margin:12px 0">${btns}</div>
     ${S?`<div class="card" style="background:var(--panel2)"><b>Best-3 outlook — Week ${w}:</b> ${wkGames} NBA game${wkGames===1?'':'s'} this week${wkGames>S.settings.gameCap?` (only his best ${S.settings.gameCap} count)`:''}. Next 7 days: ${up.length?up.join(' · '):'no games'}.</div>`:''}
     <h3>Stats <span class="muted small" style="text-transform:none;letter-spacing:0">fantasy points use your league's scoring</span></h3><div class="tw"><table><tr><th></th><th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num">FP/G</th><th class="num">FPTS</th></tr>
