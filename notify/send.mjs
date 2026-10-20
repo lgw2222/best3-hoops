@@ -137,7 +137,7 @@ for (const id of ids) {
   for (const m of toSend) {
     if (process.env.DRY) { console.log('WOULD SEND', m.title, '|', m.body); sent++; continue; }   // test mode
     try {
-      await webpush.sendNotification(sub.sub, JSON.stringify({ title: m.title, body: m.body, tag: m.tag, url: SITE + (m.lg === 'main' ? '' : '?league=' + m.lg) }), { TTL: 6 * 3600 });
+      await webpush.sendNotification(sub.sub, JSON.stringify({ title: m.title, body: m.body, tag: m.tag, url: SITE + '?league=' + m.lg }), { TTL: 6 * 3600 });
       sent++;
     } catch (e) { if (e.statusCode === 404 || e.statusCode === 410) { gone = true; break; } console.log(id, 'send failed', e.statusCode || e.message); }
   }

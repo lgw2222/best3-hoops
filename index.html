@@ -63,6 +63,21 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-
 #ticker .tk span b{color:#fff}
 @keyframes tick{to{transform:translateX(-100%)}}
 #lgSel{max-width:230px;font-weight:700}
+.hstrip{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 2px 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.hstrip::-webkit-scrollbar{display:none}
+.hcard{flex:0 0 min(320px,82vw);scroll-snap-align:start;text-align:left;padding:0;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--panel);color:inherit;font:inherit;cursor:pointer;transition:transform .3s var(--spring),box-shadow .3s}
+.hcard:hover{transform:translateY(-4px);box-shadow:0 18px 40px -20px rgba(255,61,119,.6)}
+.hcard:active{transform:scale(.98)}
+.hc-top{position:relative;height:150px;padding:16px;display:flex;flex-direction:column;justify-content:flex-end;color:#fff}
+.hc-top::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 80% at 100% 0,rgba(255,255,255,.25),transparent 60%);pointer-events:none}
+.hc-kind{position:absolute;top:14px;left:16px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,0,0,.25);padding:4px 9px;border-radius:999px}
+.hc-go{position:absolute;top:14px;right:16px;font-size:12px;font-weight:800}
+.hc-name{font:400 30px/1.05 'Bebas Neue',Inter,sans-serif;letter-spacing:.5px;text-shadow:0 2px 10px rgba(0,0,0,.25)}
+.hc-body{padding:14px 16px 16px;min-height:70px}
+.hdots{display:flex;gap:6px;justify-content:center}
+.hdots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.2);transition:all .25s}
+.hdots i.on{width:20px;border-radius:4px;background:var(--grad)}
+@media(min-width:1100px){ .hstrip{flex-wrap:wrap;overflow:visible} .hcard{flex:0 0 calc(33.33% - 10px)} .hdots{display:none} }
 select:disabled,input:disabled{opacity:.55;cursor:not-allowed}
 #who{display:flex;align-items:center;gap:10px}
 #who .who{display:flex;align-items:center;gap:8px;font-size:13px;line-height:1.15}
@@ -272,7 +287,9 @@ const LEAGUES = [
 const LEAGUE_ID = (()=>{ const m = location.search.match(/[?&]league=([\w-]+)/); return m && LEAGUES.some(l=>l.id===m[1]) ? m[1] : 'main'; })();
 const LDEF = LEAGUES.find(l=>l.id===LEAGUE_ID);
 const lk = k => LEAGUE_ID==='main' ? k : k+'@'+LEAGUE_ID;     // per-league browser keys (your team, login, commissioner)
-function switchLeague(id){ const q = new URLSearchParams(location.search); if (id==='main') q.delete('league'); else q.set('league', id); location.search = q.toString(); }
+/* no ?league= in the address = the Home screen (pick a league, like the ESPN app) */
+const HOME = !/[?&]league=/.test(location.search);
+function switchLeague(id){ const q = new URLSearchParams(location.search); q.delete('app'); if (id==='home') q.delete('league'); else q.set('league', id); location.search = q.toString(); }
 const DEMO = /[?&]demo=1/.test(location.search);   // add ?demo=1 to the URL for a private sandbox that never touches the real league
 
 const DEFAULT_SETTINGS = {
@@ -1213,10 +1230,11 @@ function weekSel(id){ const cw=curWeek(), w=ui.week||cw, pr=playoffRounds(); let
 let lastLiveReq = '';
 function render(){
   MEMO.clear();
-  $('#lgSel').innerHTML = LEAGUES.map(l=>`<option value="${l.id}" ${l.id===LEAGUE_ID?'selected':''}>${esc(l.name)}</option>`).join('');
+  $('#lgSel').innerHTML = `<option value="home" ${HOME?'selected':''}>🏠 Home — all leagues</option>` + LEAGUES.map(l=>`<option value="${l.id}" ${!HOME&&l.id===LEAGUE_ID?'selected':''}>${esc(l.name)}</option>`).join('');
+  if (HOME){ renderHome(); return; }
   $('#meSel').parentElement.style.display = S ? '' : 'none';
   if (!S && ui.tab==='mock'){ $('#tabs').innerHTML=`<button class="on">Mock Draft</button><button onclick="go('matchup')">← Create league</button>`; $('#view').innerHTML=vMock(); renderMockList(); return; }
-  if (!S && LOADED && (LDEF.mirror||LDEF.seed) && !LOST_COPY){ if (!BUILDING) buildFromSource(); $('#tabs').innerHTML=''; $('#view').innerHTML = `<div class="card"><h2 style="margin-top:0">${esc(LDEF.name)}</h2><p>${BUILD_ERR?'<b>Could not load it:</b> '+esc(BUILD_ERR)+' <button class="btn sm" onclick="BUILD_ERR=\'\';render()">Try again</button>':'Copying the league from '+(LDEF.mirror||LDEF.seed).src.toUpperCase()+'…'}</p><div class="skel" style="width:60%"></div></div>`; return; }
+  if (!HOME && !S && LOADED && (LDEF.mirror||LDEF.seed) && !LOST_COPY){ if (!BUILDING) buildFromSource(); $('#tabs').innerHTML=''; $('#view').innerHTML = `<div class="card"><h2 style="margin-top:0">${esc(LDEF.name)}</h2><p>${BUILD_ERR?'<b>Could not load it:</b> '+esc(BUILD_ERR)+' <button class="btn sm" onclick="BUILD_ERR=\'\';render()">Try again</button>':'Copying the league from '+(LDEF.mirror||LDEF.seed).src.toUpperCase()+'…'}</p><div class="skel" style="width:60%"></div></div>`; return; }
   if (!S){ renderSetup(); return; }
   if (LOGIN()){ const a = authTeam(); if (!a){ $('#lgname').textContent = S.settings.name; $('#meSel').parentElement.style.display='none'; $('#who').innerHTML=''; renderLogin(); return; } ME = a; }
   if (!S.teams[ME]) ME = teamIds()[0];
@@ -1722,6 +1740,49 @@ async function saveResults(){
     }
   }catch(e){ console.warn('saveResults', e); }
   SAVING_RES = false;
+}
+/* ======== HOME: swipe through your leagues and tap one to go in ======== */
+const LG_STYLE = { main:['Our league','linear-gradient(135deg,#ff7a1a,#ff3d77)'], dyn:['Our rules · Dynasty','linear-gradient(135deg,#8b5cf6,#ff3d77)'],
+  'm-dyn':['Sleeper mirror','linear-gradient(135deg,#0ea5e9,#6366f1)'], 'm-other':['Sleeper mirror','linear-gradient(135deg,#14b8a6,#0ea5e9)'], 'm-espn':['ESPN mirror','linear-gradient(135deg,#ef4444,#b91c1c)'] };
+let HOMEDATA = null;
+const meKey = id => id==='main' ? 'b3h_me' : 'b3h_me@'+id;
+async function homeLoad(){
+  if (HOMEDATA || !LOADED) return; HOMEDATA = {};
+  const pick = d => d ? {name: d.settings && d.settings.name, teams: d.teams||{}, results: d.results||{}, sync: d.sync||null, mirror: d.settings && d.settings.mirror, draft: d.draft && d.draft.status, start: d.settings && d.settings.seasonStart} : null;
+  await Promise.all(LEAGUES.map(async L=>{
+    try{
+      if (STORE_MODE==='firebase'){
+        const db = firebase.database(), base = DB_ROOT+'/leagues/'+L.id+'/';
+        const [st, tm, rs, sy, dr] = await Promise.all(['settings','teams','results','sync','draft/status'].map(k=>db.ref(base+k).once('value').then(x=>x.val())));
+        HOMEDATA[L.id] = st ? pick({settings:st, teams:tm, results:rs, sync:sy, draft:{status:dr}}) : null;
+      } else { let x=null; try{ x = JSON.parse(lsGet('b3h_'+(DEMO?'demo':'local')+(L.id==='main'?'':'_'+L.id))||'null'); }catch(e){} HOMEDATA[L.id] = pick(x); }
+    }catch(e){ HOMEDATA[L.id] = null; }
+  }));
+  if (HOME) render();
+}
+function homeCard(L){
+  const d = HOMEDATA && HOMEDATA[L.id], [kind, bg] = LG_STYLE[L.id] || ['League','var(--grad)'];
+  const me = lsGet(meKey(L.id)), team = d && me && d.teams[me];
+  let rec = '';
+  if (d && team){ let w=0,l=0,t=0; for (const k in d.results){ const r = d.results[k][me]; if (!r) continue; const o = d.results[k][r.opp]; if (!o) continue; r.pts>o.pts?w++:r.pts<o.pts?l++:t++; } rec = `${w}-${l}${t?'-'+t:''}`; }
+  const sub = !HOMEDATA ? '<div class="skel" style="width:60%;height:12px"></div>'
+    : !d ? `<span class="muted">${L.mirror||L.seed?'Not copied yet — tap to set it up':'Not created yet — tap to start'}</span>`
+    : team ? `<b>${esc(team.name)}</b>${rec?` · ${rec}`:''}` : `<span class="muted">${Object.keys(d.teams).length} teams · tap to pick your team</span>`;
+  const meta = d ? [d.mirror ? `🔁 ${d.sync&&d.sync.at ? 'synced '+new Date(d.sync.at).toLocaleString([], {month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'syncs on open'}` : d.draft==='done' ? '🏀 In season' : '📝 Before the draft', `${Object.keys(d.teams).length} teams`].join(' · ') : '';
+  return `<button class="hcard" onclick="switchLeague('${L.id}')"><div class="hc-top" style="background:${bg}"><span class="hc-kind">${esc(kind)}</span><span class="hc-go">Enter →</span>
+      <div class="hc-name">${esc((d&&d.name)||L.name)}</div></div>
+    <div class="hc-body"><div>${sub}</div><div class="muted small" style="margin-top:6px">${meta}</div></div></button>`;
+}
+function renderHome(){
+  homeLoad();
+  $('#meSel').parentElement.style.display = 'none'; $('#who').innerHTML = '';
+  $('#lgname').textContent = 'All leagues'; try{ paintTag(); }catch(e){}
+  $('#tabs').innerHTML = `<button class="on">${icon('matchup')}<span>Home</span></button>`;
+  const cards = LEAGUES.map(homeCard).join('') + `<button class="hcard" onclick="lsSet('b3h_tab','cup');switchLeague('main')"><div class="hc-top" style="background:linear-gradient(135deg,#f59e0b,#ef4444)"><span class="hc-kind">All 3 real leagues</span><span class="hc-go">Open →</span><div class="hc-name">🏆 The Tri-Cup</div></div><div class="hc-body"><div>Everyone's combined record</div><div class="muted small" style="margin-top:6px">Dynasty + Other League + ESPN</div></div></button>`;
+  $('#view').innerHTML = `<h2 style="margin-bottom:4px">Your leagues</h2><p class="muted" style="margin-top:0">Swipe to pick a league, then tap to go in. Switch any time from the menu at the top.</p>
+    <div class="hstrip" id="hstrip">${cards}</div><div class="hdots" id="hdots">${[...LEAGUES, {}].map((_,i)=>`<i class="${i?'':'on'}"></i>`).join('')}</div>`;
+  const st = $('#hstrip'), dots = [...document.querySelectorAll('#hdots i')];
+  st.addEventListener('scroll', ()=>{ const w = st.firstElementChild.getBoundingClientRect().width + 14, i = Math.round(st.scrollLeft / w); dots.forEach((x,k)=>x.classList.toggle('on', k===i)); }, {passive:true});
 }
 function setSlot(t,d,i,pid){
   const lu = lineupForDay(t,d).slice(), j = pid ? lu.indexOf(pid) : -1;
