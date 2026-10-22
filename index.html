@@ -63,6 +63,11 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-
 #ticker .tk span b{color:#fff}
 @keyframes tick{to{transform:translateX(-100%)}}
 #lgSel{max-width:230px;font-weight:700}
+.mstat{display:none}
+.ns{display:none}
+th.sortable{cursor:pointer;user-select:none}
+th.sorted,td.sorted{color:var(--acc2)}
+@media(max-width:700px){ .lu-stats td.c-pl,.lu-stats th.c-pl{width:auto!important;min-width:0!important;max-width:none!important;box-shadow:none} .lu-stats table{width:100%} .lu .dstat{display:none} .lu .mline.mstat{display:block;white-space:normal;line-height:1.45} .nf{display:none} .ns{display:inline} }
 #topbar{flex-wrap:wrap;row-gap:8px}
 #lgSel{margin-left:auto}
 #ticker{order:9;flex:1 0 100%;margin:0 -22px -10px;padding:7px 0;background:rgba(255,255,255,.035);border-top:1px solid var(--line)}
@@ -1454,7 +1459,7 @@ function sideBySide(a,b,w,A,B){
   };
   const chips = r => r && r.games.length ? `<span class="sb-chips">${r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" title="${dayName(g.date)} ${esc(g.opp||'')}">${fmt(g.fp)}</span>`).join('')}</span>` : '';
   const side = (pid, r, right) => !pid ? `<div class="sb-p ${right?'r':''}"><span class="muted">Empty</span></div>` :
-    `<div class="sb-p ${right?'r':''}"><a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${right?'':pImg(pid)}<b>${esc(pInfo(pid).name)}</b>${right?pImg(pid):''}</a>
+    `<div class="sb-p ${right?'r':''}"><a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${right?'':pImg(pid)}<b><span class="nf">${esc(pInfo(pid).name)}</span><span class="ns">${esc(shortNm(pInfo(pid).name))}</span></b>${right?pImg(pid):''}</a>
       <div class="sb-sub">${esc(pInfo(pid).team)} · ${info(pid)}</div>${chips(r)}</div>`;
   const pts = (r, other) => { const v = r ? r.pts : 0, o = other ? other.pts : 0; return `<div class="sb-pts ${v>o?'win':''}">${r?fmt(v):'—'}</div>`; };
   const row = (sl, pa, pb) => { const ra = pa && rowA(pa), rb = pb && rowB(pb);
@@ -1471,6 +1476,7 @@ function sideBySide(a,b,w,A,B){
   return h;
 }
 /* FantasyCast, ESPN-app style: both lineups side by side with live game status and today's fantasy points */
+const shortNm = n => { const w = String(n||'').split(' '); return w.length<2 ? n : w[0][0]+'. '+w.slice(1).join(' '); };
 function castSBS(a,b,w,d){
   const A = teamWeek(a,w), B = teamWeek(b,w), LA = lineupForDay(a,d), LB = lineupForDay(b,d), cap = S.settings.gameCap;
   const today = (T,L) => L.reduce((s,pid)=>{ if(!pid) return s; const r=T.rows.find(x=>x.pid===pid), wk=r&&r.games.find(x=>x.date===d); return s+(wk&&wk.counted?wk.fp:0); },0);
@@ -1481,7 +1487,7 @@ function castSBS(a,b,w,d){
     const p = pInfo(pid), gs = gameStatus(pid,d), g = gameOn(pid,d), L = g && g.line, r = T.rows.find(x=>x.pid===pid);
     const st = !plays(pid,d) ? '<span class="muted">No game</span>' : `<span style="${gs.state==='in'?'color:var(--good);font-weight:700':''}">${esc(gs.txt)}</span>`;
     const line = L ? `${L.PTS}p ${L.REB}r ${L.AST}a${L.STL?' '+L.STL+'s':''}${L.BLK?' '+L.BLK+'b':''}${L.TO?' '+L.TO+'to':''}` : (!g && gs.state==='post' && plays(pid,d) ? 'Did not play' : '');
-    return `<div class="sb-p ${right?'r':''}" style="${starter?'':'opacity:.6'}"><a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${right?'':pImg(pid)}<b>${esc(p.name)}</b>${right?pImg(pid):''}</a>
+    return `<div class="sb-p ${right?'r':''}" style="${starter?'':'opacity:.6'}"><a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${right?'':pImg(pid)}<b><span class="nf">${esc(p.name)}</span><span class="ns">${esc(shortNm(p.name))}</span></b>${right?pImg(pid):''}</a>
       <div class="sb-sub">${esc(p.team)} · ${st}</div>${line?`<div class="sb-sub" style="color:var(--text)">${line}</div>`:''}<div class="sb-sub">Wk ${r?fmt(r.pts):0} · ${r?r.games.length:0}/${cap}</div></div>`;
   };
   const fpCell = (pid, T, other, oT, starter) => {
@@ -1516,6 +1522,7 @@ function vTeam(){
   const locked = !dayOpen(d), edit = canEdit(t) && (!locked || isCommish());
   const slotLocked = pid => pid && playerLocked(pid,d) && !isCommish();
   const T = teamWeek(t,w), lu = lineupForDay(t,d), ros = rosterIds(t), bench = ros.filter(p=>!lu.includes(p));
+  if (tmode()!=='schedule'){ const k = tsort(), v = p => { const a = statsFor(pInfo(p), tstat()); return a ? (k==='TO' ? -(a.TO||0) : (a[k]||0)) : -1e9; }; bench.sort((x,y)=>v(y)-v(x)); }
   const rowOf = pid => T.rows.find(r=>r.pid===pid);
   /* ESPN-style moving: tap MOVE on a player, then HERE on where he should go */
   const mv = ui.mv && ui.mv.t===t && ui.mv.d===d && edit ? ui.mv : null;
@@ -1549,9 +1556,9 @@ function vTeam(){
     <div class="row" style="margin:4px 0 10px;justify-content:space-between">
       ${T.limit?`<span class="chip ${T.used>=T.limit?'x':'c'}" title="Team starts used this week. Maxed players swapping in a better game don't use a start.">Team starts: <b>${T.used}</b> / ${T.limit}</span>`:''}
       <div class="seg">${[['schedule','📅 Schedule'],['stats','📊 Stats'],['both','Both']].map(([k,l])=>`<button class="${tmode()===k?'on':''}" onclick="lsSet('b3h_tmode','${k}');render()">${l}</button>`).join('')}</div>
-      ${tmode()!=='schedule'?`<select title="Stat window" onchange="lsSet('b3h_tstat',this.value);render()">${Object.entries(STAT_VIEWS).map(([k,v])=>`<option value="${k}" ${k===tstat()?'selected':''}>${v}</option>`).join('')}</select>`:''}
+      ${tmode()!=='schedule'?`<select title="Stat window" onchange="lsSet('b3h_tstat',this.value);render()">${Object.entries(STAT_VIEWS).map(([k,v])=>`<option value="${k}" ${k===tstat()?'selected':''}>${v}</option>`).join('')}</select><select title="Sort bench by" onchange="lsSet('b3h_tsort',this.value);render()">${Object.entries(TSORTS).map(([k,v])=>`<option value="${k}" ${k===tsort()?'selected':''}>Sort: ${v}</option>`).join('')}</select>`:''}
     </div>
-    <div class="card tw lu"><table><tr><th class="c-slot">Slot</th><th class="mhide">${edit?'Action':''}</th><th class="c-pl">Player — ${dayName(d)}</th><th class="mhide">Today</th>${xhead(ds,d)}<th class="mhide">Started games this week</th><th class="num mhide">Week pts</th></tr>`;
+    <div class="card tw lu${tmode()==='stats'?' lu-stats':''}"><table><tr><th class="c-slot">Slot</th><th class="mhide">${edit?'Action':''}</th><th class="c-pl">Player — ${dayName(d)}</th><th class="mhide">Today</th>${xhead(ds,d)}<th class="mhide">Started games this week</th><th class="num mhide">Week pts</th></tr>`;
   const todayCell = pid => { if(!plays(pid,d)) return '<span class="muted small">no game</span>'; const g=gameOn(pid,d); if(g) return `<span class="chip ${ (rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span>`; const n=usedBefore(pid); return `<b>${esc(oppOn(pid,d)||'plays')}</b>${!isSim()&&fullGame(pInfo(pid).team,d)?` <span class="muted small">${new Date(fullGame(pInfo(pid).team,d).tip).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>`:''}${n>=cap?` <span class="small" style="color:var(--acc2)">(already ${n} games — only counts if it beats his worst)</span>`:''}`; };
   const mToday = pid => { if(!plays(pid,d)) return 'No game'; const g=gameOn(pid,d); if(g) return `<span class="chip ${(rowOf(pid)&&(rowOf(pid).games.find(x=>x.date===d)||{}).counted)?'c':'x'}">${fmt(fpts(g.line))}</span> today`; const n=usedBefore(pid), fg=!isSim()&&fullGame(pInfo(pid).team,d); return `<b style="color:var(--text)">${esc(oppOn(pid,d)||'plays')}</b>${fg?' '+new Date(fg.tip).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):''}${n>=cap?` <span style="color:var(--acc2)">· ${n} used</span>`:''}`; };
   S.settings.slots.forEach((slot,i)=>{
@@ -1559,7 +1566,7 @@ function vTeam(){
     /* name opens the player card (like ESPN); the separate Swap menu replaces him */
     const swapOpts = ros.filter(x=>x!==pid && eligible(slot,pInfo(x).pos) && !slotLocked(x)).map(x=>`<option value="${x}">${esc(pInfo(x).name)} (${esc(pInfo(x).pos)})${plays(x,d)?' ● '+esc(shortOpp(x,d)):' · no game'}</option>`).join('');
     const act = mv ? (canHereSlot(i) ? hereSlot(i) : (mv.pid===pid ? mvBtn(pid,i) : '')) : (pid ? mvBtn(pid,i) : '');
-    const cell = p ? `<div class="pcell">${slotLocked(pid)?'🔒 ':''}${pLink(pid,true)} <span class="muted small psub">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span><div class="mline">${mToday(pid)} · Wk <b style="color:var(--text)">${r?fmt(r.pts):'0'}</b></div></div>` : '<span class="muted">Empty</span>';
+    const cell = p ? `<div class="pcell">${slotLocked(pid)?'🔒 ':''}${pLink(pid,true)} <span class="muted small psub">${esc(p.pos)} · ${esc(p.team)}${p.inj?' · '+esc(p.inj):''}</span><div class="mline">${mToday(pid)} · Wk <b style="color:var(--text)">${r?fmt(r.pts):'0'}</b></div>${statLine(pid)}</div>` : '<span class="muted">Empty</span>';
     const dim = mv && mv.pid!==pid && !canHereSlot(i);
     h += `<tr class="${mv&&mv.pid===pid?'mvsrc':''}${dim?' mvdim':''}"><td class="c-slot"><span class="pos">${slot}</span><span class="monly">${act}</span></td><td class="mvc mhide">${act}</td><td class="c-pl">${cell}</td><td class="mhide">${p?todayCell(pid):''}</td>${xcols(t,pid,ds,d,r)}
       <td class="mhide">${r?r.games.map(g=>`<span class="chip ${g.counted?'c':'x'}" style="${g.overLimit?'text-decoration:line-through':''}" title="${dayName(g.date)}${g.overLimit?' — team starts were used up':g.counted?'':' — not in his best '+cap}">${fmt(g.fp)}</span>`).join(''):''}</td><td class="num mhide"><b>${r?fmt(r.pts):''}</b></td></tr>`;
@@ -1567,24 +1574,33 @@ function vTeam(){
   const benchPts = T.rows.filter(r=>!lu.includes(r.pid));
   h += `<tr><td class="c-slot"></td><td class="mhide"></td><td class="c-pl"><b>Week total</b><span class="monly"> <b style="color:var(--good)">${fmt(T.total)}</b></span></td><td class="mhide"></td>${xfoot(t,ds,d,lu)}<td class="mhide"></td><td class="num mhide"><b>${fmt(T.total)}</b></td></tr></table></div>
     ${benchPts.length?`<p class="muted small">Also counting this week (started on other days): ${benchPts.map(r=>`${pLink(r.pid)} ${fmt(r.pts)}`).join(' · ')}</p>`:''}
-    <h3>Bench — ${dayName(d)}</h3><div class="card tw lu"><table><tr><th class="c-slot">${edit?'Action':''}</th><th class="c-pl">Player</th><th class="mhide">Pos</th><th class="mhide">Team</th>${xhead(ds,d)}<th class="mhide">Today</th><th></th></tr>${mv&&mv.from>=0?`<tr class="mvtarget"><td class="mvc c-slot"><button class="mvb here" onclick="ui.mv=null;setSlot('${t}','${d}',${mv.from},'')">HERE</button></td><td colspan="40"><b>Move ${esc(pInfo(mv.pid).name)} to the bench</b></td></tr>`:''}${bench.map(p=>{const i=pInfo(p);const dimB = mv && mv.pid!==p && !canHereBench(p);return `<tr class="${mv&&mv.pid===p?'mvsrc':''}${dimB?' mvdim':''}"><td class="mvc c-slot">${mv ? (canHereBench(p) ? hereBench(p) : (mv.pid===p ? mvBtn(p,-1) : '')) : mvBtn(p,-1)}</td><td class="c-pl"><div class="pcell">${pLink(p,true)}<span class="mhide">${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</span><span class="monly muted small psub">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span><div class="mline">${mToday(p)}</div></div></td><td class="mhide"><span class="pos">${esc(i.pos)}</span></td><td class="mhide">${esc(i.team)}</td>${xcols(t,p,ds,d,T.rows.find(r=>r.pid===p))}<td class="mhide">${plays(p,d)?`<b>${esc(oppOn(p,d)||'plays')}</b> <span class="muted small">(won't count on bench)</span>`:'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
+    <h3>Bench — ${dayName(d)}</h3><div class="card tw lu${tmode()==='stats'?' lu-stats':''}"><table><tr><th class="c-slot">${edit?'Action':''}</th><th class="c-pl">Player</th><th class="mhide">Pos</th><th class="mhide">Team</th>${xhead(ds,d)}<th class="mhide">Today</th><th></th></tr>${mv&&mv.from>=0?`<tr class="mvtarget"><td class="mvc c-slot"><button class="mvb here" onclick="ui.mv=null;setSlot('${t}','${d}',${mv.from},'')">HERE</button></td><td colspan="40"><b>Move ${esc(pInfo(mv.pid).name)} to the bench</b></td></tr>`:''}${bench.map(p=>{const i=pInfo(p);const dimB = mv && mv.pid!==p && !canHereBench(p);return `<tr class="${mv&&mv.pid===p?'mvsrc':''}${dimB?' mvdim':''}"><td class="mvc c-slot">${mv ? (canHereBench(p) ? hereBench(p) : (mv.pid===p ? mvBtn(p,-1) : '')) : mvBtn(p,-1)}</td><td class="c-pl"><div class="pcell">${pLink(p,true)}<span class="mhide">${i.inj?` <span class="muted small">${esc(i.inj)}</span>`:''}</span><span class="monly muted small psub">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span><div class="mline">${mToday(p)}</div>${statLine(p)}</div></td><td class="mhide"><span class="pos">${esc(i.pos)}</span></td><td class="mhide">${esc(i.team)}</td>${xcols(t,p,ds,d,T.rows.find(r=>r.pid===p))}<td class="mhide">${plays(p,d)?`<b>${esc(oppOn(p,d)||'plays')}</b> <span class="muted small">(won't count on bench)</span>`:'<span class="muted small">no game</span>'}</td><td class="num">${canEdit(t)&&S.draft.status==='done'?`${S.settings.irSlots&&canIR(p)?`<button class="btn sm" onclick="moveToIR('${t}','${p}')">IR</button> `:''}<button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted">Nobody on the bench</td></tr>'}</table></div>
     ${S.settings.irSlots?`<h3>Injured reserve (${irIds(t).length}/${S.settings.irSlots})</h3><div class="card tw"><table>${irIds(t).map(p=>{const i=pInfo(p);return `<tr><td>${pLink(p)} <span class="muted small">${esc(i.pos)} · ${esc(i.team)}${i.inj?' · '+esc(i.inj):''}</span></td><td class="num">${canEdit(t)?`<button class="btn sm" onclick="activateIR('${t}','${p}')">Activate</button> <button class="btn sm danger" onclick="confirmDrop('${t}','${p}')">Drop</button>`:''}</td></tr>`;}).join('')||'<tr><td class="muted small">Empty. Players listed as OUT can be moved here from the bench to free a roster spot (games on IR never count).</td></tr>'}</table></div>`:''}`;
   return h;
 }
 /* My Team view mode: schedule grid, stats, or both (remembered per browser) */
 const tmode = () => lsGet('b3h_tmode') || (innerWidth<=700 ? 'schedule' : 'both');
 const tstat = () => lsGet('b3h_tstat') || 'season';
+const tsort = () => lsGet('b3h_tsort') || 'FPG';
+const TSORTS = {FPG:'FP/G', PTS:'Points', REB:'Rebounds', AST:'Assists', STL:'Steals', BLK:'Blocks', TO:'Turnovers', MIN:'Minutes', GP:'Games played'};
+/* "15.2 FP/G · 22 pts · 5 reb · 4 ast …" for the chosen stat window — shown under the name on phones */
+function statLine(pid){
+  if (tmode()==='schedule') return '';
+  const a = statsFor(pInfo(pid), tstat()); if (!a) return `<div class="mline mstat muted">No games — ${esc(STAT_VIEWS[tstat()])}</div>`;
+  const f = x => fmt(x||0), k = tsort(), b = (key, txt) => key===k ? `<b style="color:var(--acc2)">${txt}</b>` : txt;
+  return `<div class="mline mstat">${b('FPG', `<b style="color:var(--text)">${f(a.FPG)}</b> FP/G`)} · ${b('PTS', f(a.PTS)+' pts')} · ${b('REB', f(a.REB)+' reb')} · ${b('AST', f(a.AST)+' ast')}<br>${b('STL', f(a.STL)+' stl')} · ${b('BLK', f(a.BLK)+' blk')} · ${b('TO', f(a.TO)+' to')} · ${b('MIN', f(a.MIN)+' min')} · ${b('GP', a.GP+' gp')}</div>`;
+}
 const shortOpp = (pid,d) => (oppOn(pid,d)||'').replace(/^vs /,'').replace(/^@ /,'@').replace(/ ·.*/,'');
 function xhead(ds,d){
   let h = '';
   if (tmode()!=='stats') h += ds.map(x=>`<th class="dcol${x===d?' cur':''}">${dayName(x)}<br><span style="font-weight:600;letter-spacing:0">${+x.slice(4,6)}/${+x.slice(6)}</span></th>`).join('') + '<th class="num" title="NBA games this week">Gms</th>';
-  if (tmode()!=='schedule') h += `<th class="num">GP</th><th class="num">MIN</th><th class="num">PTS</th><th class="num">REB</th><th class="num">AST</th><th class="num">STL</th><th class="num">BLK</th><th class="num">TO</th><th class="num" title="${esc(STAT_VIEWS[tstat()])}">FP/G</th>`;
+  if (tmode()!=='schedule') h += [['GP','GP'],['MIN','MIN'],['PTS','PTS'],['REB','REB'],['AST','AST'],['STL','STL'],['BLK','BLK'],['TO','TO'],['FPG','FP/G']].map(([k,l])=>`<th class="num dstat sortable ${tsort()===k?'sorted':''}" title="Sort the bench by ${l}" onclick="lsSet('b3h_tsort','${k}');render()">${l}${tsort()===k?' ▾':''}</th>`).join('');
   return h;
 }
 /* one row: each day shows the opponent; after it's played it shows his fantasy points
    (green = counted, red = outside best 3, faded = he was on your bench) */
 function xcols(t,pid,ds,d,r){
-  if (!pid) return xhead(ds,d).replace(/<th[^>]*>.*?<\/th>/g,'<td></td>');
+  if (!pid) return xhead(ds,d).replace(/<th(?:\s+class="([^"]*)")?[^>]*>.*?<\/th>/g,(m,c)=>`<td class="${c||''}"></td>`);
   let h = '';
   if (tmode()!=='stats'){
     let n = 0;
@@ -1599,8 +1615,8 @@ function xcols(t,pid,ds,d,r){
   }
   if (tmode()!=='schedule'){
     const a = statsFor(pInfo(pid), tstat()), f = x => x==null ? '—' : fmt(x);
-    h += a ? `<td class="num">${a.GP}</td><td class="num">${f(a.MIN)}</td><td class="num">${f(a.PTS)}</td><td class="num">${f(a.REB)}</td><td class="num">${f(a.AST)}</td><td class="num">${f(a.STL)}</td><td class="num">${f(a.BLK)}</td><td class="num">${f(a.TO)}</td><td class="num"><b>${f(a.FPG)}</b></td>`
-           : `<td colspan="9" class="muted small">no games in this window</td>`;
+    h += a ? ['GP','MIN','PTS','REB','AST','STL','BLK','TO','FPG'].map(k=>`<td class="num dstat ${tsort()===k?'sorted':''}">${k==='FPG'?'<b>'+f(a[k])+'</b>':k==='GP'?a.GP:f(a[k])}</td>`).join('')
+           : `<td colspan="9" class="muted small dstat">no games in this window</td>`;
   }
   return h;
 }
@@ -1608,7 +1624,7 @@ function xcols(t,pid,ds,d,r){
 function xfoot(t,ds,d,lu){
   let h = '';
   if (tmode()!=='stats') h += ds.map(x=>{ const n = lineupForDay(t,x).filter(p=>p&&plays(p,x)).length; return `<td class="dcol${x===d?' cur':''}"><span class="small" title="starters with a game">${n}/${S.settings.slots.length}</span></td>`; }).join('') + '<td></td>';
-  if (tmode()!=='schedule') h += '<td colspan="9"></td>';
+  if (tmode()!=='schedule') h += '<td colspan="9" class="dstat"></td>';
   return h;
 }
 /* heads-up when the real NBA schedule is thin (NBA Cup break, All-Star break) */
