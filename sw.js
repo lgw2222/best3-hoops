@@ -1,5 +1,5 @@
 /* Best of 3 Hoops — service worker: installable app, offline fallback, push notifications */
-const CACHE = 'b3h-v7';
+const CACHE = 'b3h-v10';
 const SHELL = ['./', './index.html', './b3h-app.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(()=>{})); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

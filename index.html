@@ -1470,6 +1470,36 @@ function sideBySide(a,b,w,A,B){
   h += `<div class="sb-row sb-tot"><div class="sb-p"><b>Total</b></div><div class="sb-pts ${A.total>B.total?'win':''}">${fmt(A.total)}</div><div class="sb-slot"></div><div class="sb-pts ${B.total>A.total?'win':''}">${fmt(B.total)}</div><div class="sb-p r"><b>Total</b></div></div></div>`;
   return h;
 }
+/* FantasyCast, ESPN-app style: both lineups side by side with live game status and today's fantasy points */
+function castSBS(a,b,w,d){
+  const A = teamWeek(a,w), B = teamWeek(b,w), LA = lineupForDay(a,d), LB = lineupForDay(b,d), cap = S.settings.gameCap;
+  const today = (T,L) => L.reduce((s,pid)=>{ if(!pid) return s; const r=T.rows.find(x=>x.pid===pid), wk=r&&r.games.find(x=>x.date===d); return s+(wk&&wk.counted?wk.fp:0); },0);
+  const stat = (T,L) => ({today: today(T,L), playing: L.filter(p=>p&&plays(p,d)).length, left: L.filter(p=>p&&plays(p,d)&&gameStatus(p,d).state!=='post').length});
+  const SA = stat(A,LA), SB = stat(B,LB);
+  const cell = (pid, T, starter, right) => {
+    if (!pid) return `<div class="sb-p ${right?'r':''}"><span class="muted">Empty</span></div>`;
+    const p = pInfo(pid), gs = gameStatus(pid,d), g = gameOn(pid,d), L = g && g.line, r = T.rows.find(x=>x.pid===pid);
+    const st = !plays(pid,d) ? '<span class="muted">No game</span>' : `<span style="${gs.state==='in'?'color:var(--good);font-weight:700':''}">${esc(gs.txt)}</span>`;
+    const line = L ? `${L.PTS}p ${L.REB}r ${L.AST}a${L.STL?' '+L.STL+'s':''}${L.BLK?' '+L.BLK+'b':''}${L.TO?' '+L.TO+'to':''}` : (!g && gs.state==='post' && plays(pid,d) ? 'Did not play' : '');
+    return `<div class="sb-p ${right?'r':''}" style="${starter?'':'opacity:.6'}"><a class="pl" onclick="event.stopPropagation();openPlayer('${pid}')">${right?'':pImg(pid)}<b>${esc(p.name)}</b>${right?pImg(pid):''}</a>
+      <div class="sb-sub">${esc(p.team)} · ${st}</div>${line?`<div class="sb-sub" style="color:var(--text)">${line}</div>`:''}<div class="sb-sub">Wk ${r?fmt(r.pts):0} · ${r?r.games.length:0}/${cap}</div></div>`;
+  };
+  const fpCell = (pid, T, other, oT, starter) => {
+    const g = pid && gameOn(pid,d), r = pid && T.rows.find(x=>x.pid===pid), wk = r && r.games.find(x=>x.date===d);
+    const v = g ? fpts(g.line) : null, og = other && gameOn(other,d), ov = og ? fpts(og.line) : null;
+    if (v===null) return `<div class="sb-pts muted">—</div>`;
+    const cls = !starter ? '' : wk && wk.counted ? 'c' : 'x';
+    return `<div class="sb-pts ${ov!==null && v>ov ? 'win':''}"><span class="chip ${cls}" title="${starter?(wk&&wk.counted?'counts':'not in his best '+cap):'bench — does not count'}">${fmt(v)}</span></div>`;
+  };
+  const row = (sl, pa, pb, starter) => `<div class="sb-row">${cell(pa,A,starter,false)}${fpCell(pa,A,pb,B,starter)}<div class="sb-slot"><span class="pos">${esc(sl)}</span></div>${fpCell(pb,B,pa,A,starter)}${cell(pb,B,starter,true)}</div>`;
+  let h = `<div class="sb" style="border-top:0;margin-top:4px;padding-top:0">
+    <div class="sb-row sb-tot" style="border-bottom:1px solid var(--line)"><div class="sb-p"><b>${esc(tName(a))}</b><div class="sb-sub">+${fmt(SA.today)} today</div><div class="sb-sub">${SA.playing} playing · ${SA.left} left</div></div><div class="sb-pts ${A.total>B.total?'win':''}" style="font-size:20px">${fmt(A.total)}</div><div class="sb-slot muted small">vs</div><div class="sb-pts ${B.total>A.total?'win':''}" style="font-size:20px">${fmt(B.total)}</div><div class="sb-p r"><b>${esc(tName(b))}</b><div class="sb-sub">+${fmt(SB.today)} today</div><div class="sb-sub">${SB.playing} playing · ${SB.left} left</div></div></div>
+    <div class="sb-head"><span>Player · game</span><span>FP ${dayName(d)}</span><span></span><span>FP ${dayName(d)}</span><span>Player · game</span></div>`;
+  S.settings.slots.forEach((sl,i)=>{ h += row(sl, LA[i], LB[i], true); });
+  const BA = rosterIds(a).filter(p=>!LA.includes(p)), BB = rosterIds(b).filter(p=>!LB.includes(p)), n = Math.max(BA.length, BB.length);
+  if (n){ h += `<div class="sb-sec">Bench — games here don't count</div>`; for (let i=0;i<n;i++) h += row('BE', BA[i], BB[i], false); }
+  return h + `</div>`;
+}
 function detail(T){
   return `<div class="tw"><table><tr><th>Slot</th><th>Player</th><th>Started games</th><th class="num">Pts</th></tr>${T.rows.map(r=>{
     const p = pInfo(r.pid);
@@ -2462,9 +2492,7 @@ function vCast(){
       <table><tr><th>Slot</th><th>Player · game · live stats</th><th class="num">FP ${dayName(d)}</th><th class="num">Week</th></tr>${starters}
       <tr><td colspan="4" class="small muted" style="padding-top:12px">Bench — games here don't count</td></tr>${bench}</table></div>`};
   };
-  const A = side(pair[0]), B = side(pair[1]);
-  h += `<div class="card"><div class="mu" style="cursor:default"><div><b>${esc(tName(pair[0]))}</b></div><div class="s"><span class="${A.T.total>B.T.total?'win':''}">${fmt(A.T.total)}</span> <span class="muted">–</span> <span class="${B.T.total>A.T.total?'win':''}">${fmt(B.T.total)}</span></div><div class="r"><b>${esc(tName(pair[1]))}</b></div></div></div>
-    <div class="grid2">${A.html}${B.html}</div>`;
+  h += `<div class="card">${castSBS(pair[0], pair[1], w, d)}</div>`;
   return h;
 }
 setInterval(()=>{ try{ if (S && ui.tab==='cast' && !isSim() && document.visibilityState==='visible'){ lastLiveReq=''; render(); } }catch(e){} }, 60000);
