@@ -63,6 +63,14 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-
 #ticker .tk span b{color:#fff}
 @keyframes tick{to{transform:translateX(-100%)}}
 #lgSel{max-width:230px;font-weight:700}
+details.plan summary{cursor:pointer}
+.planbar{display:flex;height:12px;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.07);border:1px solid var(--line)}
+.planbar i{display:block;height:100%;transition:width .5s var(--ease)}
+.rseg{padding:3px;gap:2px}
+.rinline{display:none;margin-top:6px}
+.rseg button{padding:5px 9px;font-size:11.5px}
+.plan-tiles{grid-template-columns:repeat(4,1fr)}
+@media(max-width:700px){ .plan .rcol{display:none} .plan .rinline{display:block} .plan-tiles{grid-template-columns:repeat(2,1fr)} .plan .tile .v{font-size:28px} .rseg button{padding:6px 7px} }
 .mstat{display:none}
 .ns{display:none}
 th.sortable{cursor:pointer;user-select:none}
@@ -857,7 +865,8 @@ const AUTO_MODES = {
   proj:  {label:'Smart (best-3 aware)', desc:"Each day, starts players who have a game, favoring the best projected scorers who haven't used their 3 games yet."},
   avg:   {label:'Highest average points', desc:'Each day, starts the players with a game and the best fantasy points per game.'},
   total: {label:'Most total points (season)', desc:'Each day, starts the players with a game and the most fantasy points this season.'},
-  games: {label:'Most games this week', desc:'Favors players with the most games this week, then average.'}
+  games: {label:'Most games this week', desc:'Favors players with the most games this week, then average.'},
+  plan:  {label:'Follow my start plan', desc:'Uses your Start planner: Core players get all their starts first, then your Spot players fill the starts that are left — so no team starts get wasted.'}
 };
 function projAvg(p){
   const src = (p.cur && p.cur.GP>=5) ? p.cur : (p.proj || p.last);
@@ -902,7 +911,90 @@ function autoDayLive(t,d,mode){
   return fillSlots(ideal.concat(rosterIds(t)).filter((p,i,a)=>a.indexOf(p)===i && !keep.has(p) && !benchLocked.has(p)), fixed);
 }
 function startActive(t,d,mode){ Store.update({['lineups/'+t+'/d'+d]: luObj(autoDayLive(t,d,mode||lsGet('b3h_automode')||'proj'))}); }
+/* ======== START PLANNER: Core players always use their max starts, Spot players fill what's left ======== */
+const roleOf = (t,pid,w) => { const tm = S.teams[t]||{}, wr = tm.wroles && tm.wroles['w'+w]; if (wr && wr[pid]) return wr[pid]==='none' ? 'none' : wr[pid]; return (tm.roles && tm.roles[pid]) || 'none'; };
+const planVal = pid => { const a = statsFor(pInfo(pid),'season'); return a && a.GP>=3 ? a.FPG : projAvg(pInfo(pid)); };
+function planWeek(t,w,asOf){
+  return memo('plan|'+t+'|'+w+'|'+asOf, ()=>{
+    const ds = weekDates(w), cap = S.settings.gameCap>=99 ? 99 : S.settings.gameCap, lim = teamLimit() || Infinity;
+    const hist = ds.filter(d=>d<asOf), fut = ds.filter(d=>d>=asOf), n = {};
+    for (const e of hist) for (const p of lineupForDay(t,e)) if (p && plays(p,e)) n[p] = (n[p]||0)+1;
+    const used = Math.min(lim, Object.values(n).reduce((a,x)=>a+Math.min(cap,x),0));
+    let left = lim - used;
+    const ps = rosterIds(t).map(pid=>{ const days = fut.filter(d=>plays(pid,d) && !(d===todayStr() && playerLocked(pid,d))), capLeft = Math.max(0, cap-(n[pid]||0));
+      return {pid, role: roleOf(t,pid,w), days, done: n[pid]||0, capLeft, can: Math.min(days.length, capLeft), val: planVal(pid), out: /out/i.test(pInfo(pid).inj||''), alloc:0}; });
+    const byVal = (a,b)=>b.val-a.val;
+    const core = ps.filter(x=>x.role==='core').sort(byVal), spot = ps.filter(x=>x.role==='spot').sort(byVal), other = ps.filter(x=>x.role==='none').sort(byVal);
+    const coreNeed = core.reduce((a,x)=>a+(x.out?0:x.can),0);
+    for (const x of core){ if (x.out) continue; x.alloc = Math.min(x.can, Math.max(0,left)); left -= x.alloc; }
+    for (const x of spot){ if (x.out) continue; x.alloc = Math.min(x.can, Math.max(0,left)); left -= x.alloc; }
+    // day by day: can the planned starts actually fit in the lineup spots?
+    const rem = Object.fromEntries(ps.map(x=>[x.pid,x.alloc])), rk = Object.fromEntries(ps.map(x=>[x.pid,(x.role==='core'?2e6:x.role==='spot'?1e6:0)+x.val]));
+    const byDay = {};
+    for (const d of fut){
+      // players who must start every remaining game go first, so flexible players don't take their spot
+      const gl = x => x.days.filter(e=>e>=d).length, urg = x => rem[x.pid] >= gl(x) ? 4e6 : 0;
+      const cands = ps.filter(x=>rem[x.pid]>0 && plays(x.pid,d)).sort((a,b)=>(urg(b)+rk[b.pid])-(urg(a)+rk[a.pid])).map(x=>x.pid);
+      const lu = fillSlots(cands), placed = lu.filter(Boolean);
+      placed.forEach(p=>rem[p]--); byDay[d] = {placed: placed.length, wanted: cands.length};
+    }
+    const unplaced = Object.values(rem).reduce((a,x)=>a+x,0);
+    return {ds, fut, cap, lim, used, coreNeed, coreAlloc: core.reduce((a,x)=>a+x.alloc,0), spotWant: spot.reduce((a,x)=>a+(x.out?0:x.can),0), spotAlloc: spot.reduce((a,x)=>a+x.alloc,0),
+      free: lim===Infinity ? Infinity : Math.max(0,left), core, spot, other, byDay, unplaced, ps};
+  });
+}
+/* the "Follow my start plan" auto lineup for one day */
+function planDay(t,d){
+  const w = weekOfDate(d), P = planWeek(t,w,d), lim = teamLimit();
+  const has = x => plays(x.pid,d), rk = x => (x.alloc >= x.days.length ? 4e6 : 0) + (x.role==='core'?2e6:x.role==='spot'?1e6:0)+x.val;
+  const planned = P.ps.filter(x=>x.alloc>0 && has(x)).sort((a,b)=>rk(b)-rk(a)).map(x=>x.pid);
+  const maxed = P.ps.filter(x=>x.capLeft===0 && has(x) && x.role!=='none').sort((a,b)=>b.val-a.val).map(x=>x.pid);   // a better game swaps in for free
+  const extra = lim ? [] : P.ps.filter(x=>has(x) && !planned.includes(x.pid)).sort((a,b)=>b.val-a.val).map(x=>x.pid);   // no team limit: more games can't hurt
+  const idle = P.ps.filter(x=>!has(x)).map(x=>x.pid);
+  return fillSlots([...planned, ...maxed, ...extra, ...idle].filter((p,i,a)=>a.indexOf(p)===i));
+}
+function setRole(t,pid,role){
+  const w = ui.week||curWeek(), scope = lsGet('b3h_planscope') || 'all';
+  if (scope==='week') Store.update({['teams/'+t+'/wroles/w'+w+'/'+pid]: role});
+  else { const u = {['teams/'+t+'/roles/'+pid]: role==='none'?null:role}; if (S.teams[t].wroles && S.teams[t].wroles['w'+w] && S.teams[t].wroles['w'+w][pid]) u['teams/'+t+'/wroles/w'+w+'/'+pid] = null; Store.update(u); }
+}
+function suggestRoles(t){
+  const ids = rosterIds(t).filter(p=>!/out/i.test(pInfo(p).inj||'')).sort((a,b)=>planVal(b)-planVal(a)), nCore = Math.ceil(S.settings.slots.length*0.6), u = {};
+  ids.forEach((p,i)=>{ u['teams/'+t+'/roles/'+p] = i<nCore ? 'core' : 'spot'; });
+  Store.update(u);
+}
+function plannerCard(t,w,edit){
+  const ds = weekDates(w), asOf = ds.find(x=>!dayLocked(x)) || null;
+  if (!asOf) return '';
+  const P = planWeek(t,w,asOf), scope = lsGet('b3h_planscope') || 'all', inf = P.lim===Infinity;
+  const open = ui.planOpen ?? (lsGet('b3h_planopen')!=='0');
+  const total = inf ? null : P.lim, seg = (v,c,lab) => !total || !v ? '' : `<i style="width:${Math.min(100,v/total*100)}%;background:${c}" title="${lab}: ${v}"></i>`;
+  const over = !inf && P.coreNeed > P.lim - P.used;
+  const roleBtns = x => !edit ? `<span class="tag">${x.role==='none'?'—':x.role}</span>` : `<span class="seg rseg">${[['core','Core'],['spot','Spot'],['none','—']].map(([k,l])=>`<button class="${x.role===k?'on':''}" onclick="setRole('${t}','${x.pid}','${k}')">${l}</button>`).join('')}</span>`;
+  const prow = x => `<tr class="${x.out?'mvdim':''}"><td style="white-space:normal"><div class="pcell">${pLink(x.pid,true)}</div>
+      <div class="small muted">${x.days.length?x.days.map(d=>dayName(d).slice(0,2)).join(' '):'no games left'} · ${fmt(x.val)} FP/G${x.done?` · ${x.done} started`:''}${x.out?' · <b style="color:var(--bad)">OUT</b>':''}</div><div class="rinline">${roleBtns(x)}</div></td>
+      <td class="num"><b style="font-size:16px;color:${x.alloc?'var(--good)':'var(--mute)'}">${x.alloc}</b><div class="small muted">of ${x.can}</div></td><td class="num rcol">${roleBtns(x)}</td></tr>`;
+  const sect = (lab, arr, note) => arr.length ? `<tr><td colspan="3" class="sb-sec" style="padding-top:12px">${lab} <span class="muted small" style="text-transform:none;letter-spacing:0">${note}</span></td></tr>${arr.map(prow).join('')}` : '';
+  return `<details class="card plan" ${open?'open':''} ontoggle="ui.planOpen=this.open;lsSet('b3h_planopen',this.open?'1':'0')"><summary><b>🧮 Start planner</b> <span class="muted small">— Core players always get their max ${P.cap>=99?'':P.cap+' '}starts, Spot players fill the rest</span></summary>
+    <div class="tiles plan-tiles" style="margin-top:12px">
+      <div class="tile"><div class="k">Team starts</div><div class="v">${inf?'∞':P.lim}</div><div class="d">${P.used} used so far</div></div>
+      <div class="tile"><div class="k">Core need</div><div class="v" style="color:${over?'var(--bad)':'inherit'}">${P.coreNeed}</div><div class="d">${P.core.length} core players</div></div>
+      <div class="tile"><div class="k">Spot starts</div><div class="v">${P.spotAlloc}</div><div class="d">of ${P.spotWant} possible</div></div>
+      <div class="tile"><div class="k">Left over</div><div class="v" style="color:${!inf&&P.free===0?'var(--good)':'inherit'}">${inf?'∞':P.free}</div><div class="d">${inf?'no team limit':P.free?'unplanned starts':'every start planned ✓'}</div></div>
+    </div>
+    ${total?`<div class="planbar">${seg(P.used,'#64748b','Used')}${seg(P.coreAlloc,'#ff7a1a','Core')}${seg(P.spotAlloc,'#3b8eea','Spot')}</div><div class="small muted" style="margin:4px 0 8px"><span style="color:#94a3b8">■</span> used · <span style="color:#ff7a1a">■</span> core · <span style="color:#3b8eea">■</span> spot · ▢ open</div>`:''}
+    ${over?`<div class="banner">Your Core players need <b>${P.coreNeed}</b> starts but only <b>${P.lim-P.used}</b> are left — move someone to Spot.</div>`:''}
+    ${P.unplaced?`<div class="banner">${P.unplaced} planned start${P.unplaced>1?'s':''} won't fit — too many planned players on the same day${P.unplaced>1?'s':''} for your ${S.settings.slots.length} lineup spots.</div>`:''}
+    <div class="row plan-days" style="gap:6px;margin:6px 0 10px">${P.fut.map(d=>{ const b=P.byDay[d]; return `<span class="chip ${b.placed>=S.settings.slots.length?'c':''}" title="planned starters / lineup spots">${dayName(d)} ${b.placed}/${S.settings.slots.length}</span>`; }).join('')}</div>
+    ${edit?`<div class="row" style="justify-content:space-between;margin-bottom:6px"><div class="seg">${[['all','Every week'],['week','This week only']].map(([k,l])=>`<button class="${scope===k?'on':''}" onclick="lsSet('b3h_planscope','${k}');render()">${l}</button>`).join('')}</div>
+      <div class="row"><button class="btn sm" onclick="suggestRoles('${t}')">Suggest roles</button><button class="btn sm pri" onclick="lsSet('b3h_automode','plan');autoSet('${t}',${w},'plan')">Apply plan to Week ${w}</button></div></div>
+      <p class="muted small" style="margin:0 0 6px">Role changes apply to <b>${scope==='all'?'every week':'Week '+w+' only'}</b>. Tip: turn on Autopilot with "Follow my start plan" and it does this every day.</p>`:''}
+    <div class="tw"><table><tr><th>Player · games left</th><th class="num">Planned</th><th class="num rcol">Role</th></tr>
+      ${sect('Core', P.core, 'always use their max starts')}${sect('Spot', P.spot, 'fill the starts that are left, best first')}${sect('Not planned', P.other, 'only start if there are spare starts')}</table></div>
+  </details>`;
+}
 function autoDay(t,d,mode){
+  if (mode==='plan') return memo('adp|'+t+'|'+d, ()=>planDay(t,d));
   return memo('ad|'+t+'|'+d+'|'+mode, ()=>{
     const w = weekOfDate(d), ds = weekDates(w), idx = ds.indexOf(d), cap = S.settings.gameCap, used = {};
     for (const e of ds.slice(0,idx)) for (const p of lineupForDay(t,e)) if (p && plays(p,e)) used[p]=(used[p]||0)+1;
@@ -1551,6 +1643,7 @@ function vTeam(){
       <button class="btn pri" onclick="autoSet('${t}',${w},$('#amode').value)">Auto-set rest of Week ${w}</button>
       <label class="small"><input type="checkbox" ${S.teams[t].autopilot?'checked':''} onchange="Store.update({['teams/${t}/autopilot']:this.checked?$('#amode').value:null})"> Autopilot (auto-set every day I don't set myself)</label>
     </div><p id="adesc" class="muted small" style="margin:6px 0 0">${AUTO_MODES[lsGet('b3h_automode')||'proj'].desc}${S.teams[t].autopilot?` <b>Autopilot is on (${AUTO_MODES[S.teams[t].autopilot].label}).</b>`:''}</p></div>`:''}
+    ${S.draft.status==='done' && !MIRROR() ? plannerCard(t,w,canEdit(t)) : ''}
     ${t!==ME && !isCommish() ? `<div class="banner">You're viewing <b>${esc(tName(t))}</b> — read only. You can only manage <b>${esc(tName(ME))}</b>. <a href="#" onclick="ui.teamView=null;render();return false">Back to my team →</a></div>` : ''}
     ${weekNote(w,d)}
     <div class="row" style="margin:4px 0 10px;justify-content:space-between">
